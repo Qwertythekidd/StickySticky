@@ -60,6 +60,7 @@ function Note({ n, onUpdate, onDelete, zoom }) {
     <article
       data-note-id={n.id}
       className={"note " + (n.color || "yellow")}
+      tabIndex={0}
       style={{
         left: n.x || 80,
         top: n.y || 80,
@@ -91,6 +92,14 @@ function Note({ n, onUpdate, onDelete, zoom }) {
           if (document.elementFromPoint(e.clientX,e.clientY)?.closest("[data-trash]")) onDelete(n);
           else onUpdate(n, { x: n.x, y: n.y });
           drag.current = null;
+        }
+      }}
+      onPointerCancel={() => { drag.current = null; }}
+      onLostPointerCapture={() => { drag.current = null; }}
+      onKeyDown={(e) => {
+        if ((e.key === "Delete" || e.key === "Backspace") && !e.target.closest("[contenteditable],input,button")) {
+          e.preventDefault();
+          onDelete(n);
         }
       }}
     >
@@ -319,9 +328,14 @@ function App() {
       }
   }
   async function remove(n) {
-    await api("/notes/" + n.id, { method: "DELETE" });
-    setTrash((t) => [...t, n]);
-    setNotes((xs) => xs.filter((x) => x.id !== n.id));
+    try {
+      await api("/notes/" + n.id, { method: "DELETE" });
+      setTrash((t) => [...t, n]);
+      setNotes((xs) => xs.filter((x) => x.id !== n.id));
+      history.current.push({ type: "note-delete", note: n });
+    } catch {
+      setConflict(true);
+    }
   }
   async function add(e) {
     e.preventDefault();
@@ -531,6 +545,10 @@ function App() {
                 for (const f of action.fragments || []) await api("/strokes/" + f.id, { method:"DELETE" });
                 const restored=[]; for (const s of action.strokes) restored.push(await api("/strokes/" + s.id, { method:"PATCH", body:JSON.stringify({restore:true,version:s.version+1}) }));
                 setStrokes(x => [...x.filter(s => !(action.fragments||[]).some(f=>f.id===s.id)), ...restored]);
+              } else if (action.type === "note-delete") {
+                const restored = await api("/notes/" + action.note.id, { method: "PATCH", body: JSON.stringify({ restore: true, version: action.note.version + 1 }) });
+                setNotes(x => [...x, restored]);
+                setTrash(x => x.filter(n => n.id !== action.note.id));
               } else { const restored=[]; for (const s of action.strokes) restored.push(await api("/strokes/" + s.id, { method:"PATCH", body:JSON.stringify({restore:true,version:s.version+1}) })); setStrokes(x => x.map(s => restored.find(r=>r.id===s.id) || s)); }
             } catch { setConflict(true); }
           }}
@@ -601,7 +619,7 @@ function App() {
         <b>{Math.round(zoom * 100)}%</b>
         <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))}>＋</button>
       </div>
-      <div className="trash-drop" data-trash role="button" aria-label="Trash notes">🗑</div>
+      <button className="trash-drop" data-trash type="button" aria-label="Trash notes" onClick={() => document.querySelector(".note:focus")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }))}>🗑</button>
       {shrinkHint && <div className="board-size-notice" role="status">{shrinkHint}</div>}
     </div>
   );
