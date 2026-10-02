@@ -502,7 +502,7 @@ function App() {
     if (!n) return;
     const r = e.currentTarget.getBoundingClientRect();
     try {
-      const restored = await api("/notes/" + n.id, { method: "PATCH", body: JSON.stringify({ restore: true, x: (e.clientX - r.left) / sceneScale - 118, y: (e.clientY - r.top) / sceneScale - 80, version: n.version + 1 }) });
+      const restored = await api("/notes/" + n.id, { method: "PATCH", body: JSON.stringify({ restore: true, x: (e.clientX - r.left) / sceneScale - 118, y: (e.clientY - r.top) / sceneScale - 80, version: n.version }) });
       setNotes(x => [...x, restored]); setTrash(x => x.filter(v => v.id !== n.id));
     } catch { setConflict(true); }
   };
