@@ -54,7 +54,7 @@ const scenePresets = {
   window: "scene-window",
   sunset: "scene-sunset",
 };
-function Note({ n, onUpdate, onDelete, zoom }) {
+function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
   const drag = useRef(null);
   return (
     <article
@@ -65,6 +65,7 @@ function Note({ n, onUpdate, onDelete, zoom }) {
         left: n.x || 80,
         top: n.y || 80,
         "--r": `${((String(n.id).charCodeAt(0) || 3) % 7) - 3}deg`,
+        pointerEvents: tool === "select" ? "auto" : "none",
       }}
       onPointerDown={(e) => {
         if (e.target.closest("[contenteditable],input,button")) return;
@@ -106,6 +107,9 @@ function Note({ n, onUpdate, onDelete, zoom }) {
       <div className="grab">
         ⠿{" "}
       </div>
+      <svg className="note-ink" viewBox="0 0 235 174" preserveAspectRatio="none">
+        {strokes.map(s => <path key={s.id} d={s.points.map((p,i)=>`${i?"L":"M"}${p.x} ${p.y}`).join(" ")} fill="none" stroke={s.color} strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" />)}
+      </svg>
       <h3
         contentEditable
         suppressContentEditableWarning
@@ -134,7 +138,7 @@ function Note({ n, onUpdate, onDelete, zoom }) {
     </article>
   );
 }
-function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom, width, height }) {
+function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom, width, height, notes }) {
   const ref = useRef(null), drawing = useRef(null), cursor = useRef(null), [, repaint] = React.useState(0);
   const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const point = (e) => {
@@ -166,7 +170,7 @@ function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom,
       }}
       onPointerUp={(e) => {
         if (drawing.current) {
-          onDraw(drawing.current, tool);
+          onDraw(drawing.current, tool, notes);
           drawing.current = null;
         }
         if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
@@ -370,13 +374,33 @@ function App() {
     const dist=(p,x,y)=>{const dx=y.x-x.x,dy=y.y-x.y,t=Math.max(0,Math.min(1,((p.x-x.x)*dx+(p.y-x.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-(x.x+t*dx),p.y-(x.y+t*dy));};
     return Math.min(dist(a,c,d),dist(b,c,d),dist(c,a,b),dist(d,a,b));
   };
-  async function draw(points, mode) {
+  function ownership(points, ns) {
+    const segments = [];
+    let current = null, bucket = [];
+    const owner = (p) => [...ns].reverse().find(n => p.x >= n.x && p.x <= n.x + 235 && p.y >= n.y && p.y <= n.y + 174)?.id || null;
+    const routed = points.length < 2 ? points : [points[0], ...points.slice(1).flatMap((p, i) => {
+      const a = points[i], dx = p.x-a.x, dy = p.y-a.y, ts = [1];
+      for (const n of ns) for (const [axis, value] of [["x",n.x],["x",n.x+235],["y",n.y],["y",n.y+174]]) {
+        const delta = axis === "x" ? dx : dy, start = axis === "x" ? a.x : a.y;
+        const t = (value-start)/(delta || 1);
+        if (t > 0 && t < 1) { const q = {x:a.x+dx*t,y:a.y+dy*t}; if (q.x >= n.x-1e-7 && q.x <= n.x+235+1e-7 && q.y >= n.y-1e-7 && q.y <= n.y+174+1e-7) ts.push(t); }
+      }
+      return ts.sort((x,y)=>x-y).slice(0,-1).map(t=>({x:a.x+dx*t,y:a.y+dy*t})).concat(p);
+    })];
+    for (const p of routed) { const next = owner(p); if (next !== current && bucket.length) { if (bucket.length > 1) segments.push({note_id: current, points: bucket}); bucket = [bucket.at(-1), p]; } else bucket.push(p); current = next; }
+    if (bucket.length > 1) segments.push({note_id: current, points: bucket});
+    return segments;
+  }
+  async function draw(points, mode, ns) {
     if (mode === "eraser") {
       const radius = eraserRef.current / 2;
+      const surface = ownership(points.slice(0, 1), ns)[0]?.note_id || null;
+      const surfaceNote = surface && ns.find(n => n.id === surface);
+      const localEraser = surfaceNote ? points.map(p => ({x:p.x-surfaceNote.x,y:p.y-surfaceNote.y})) : points;
       const fragments=[]; const hit=[];
-      for (const s of strokesRef.current.filter(s=>!s.deleted)) {
-        const clipped=clipPolyline(s.points,points,radius,s.width);
-        if(clipped.changed) { hit.push(s); for(const fragment of clipped.polylines) fragments.push({points:fragment,color:s.color,width:s.width}); }
+      for (const s of strokesRef.current.filter(s=>!s.deleted && (s.note_id || null) === surface)) {
+        const clipped=clipPolyline(s.points,localEraser,radius,s.width);
+        if(clipped.changed) { hit.push(s); for(const fragment of clipped.polylines) fragments.push({points:fragment,color:s.color,width:s.width,note_id:s.note_id || null}); }
       }
       if (!hit.length) return;
       try { const result=await api("/strokes/batch",{method:"POST",body:JSON.stringify({originals:hit.map(s=>({id:s.id,version:s.version})),fragments})});
@@ -386,15 +410,13 @@ function App() {
       } catch { setConflict(true); }
       return;
     }
-    const s = { points, color: colorRef.current, width: markerRef.current };
+    const pieces = ownership(points, ns);
     try {
-      const saved = await api("/strokes", {
-        method: "POST",
-        body: JSON.stringify(s),
-      });
-      setStrokes((x) => [...x, saved]); history.current.push({type:"draw", strokes:[saved]});
+      const saved = await Promise.all(pieces.map(piece => api("/strokes", { method: "POST", body: JSON.stringify({...piece, color: colorRef.current, width: markerRef.current}) })));
+      setStrokes((x) => [...x, ...saved]); history.current.push({type:"draw", strokes:saved});
     } catch {
-      const local={ ...s, id: crypto.randomUUID() }; setStrokes((x) => [...x, local]); history.current.push({type:"draw", strokes:[local]});
+      const local = pieces.map(piece => ({...piece, color: colorRef.current, width: markerRef.current, id: crypto.randomUUID(), version: 1}));
+      setStrokes((x) => [...x, ...local]); history.current.push({type:"draw", strokes:local});
     }
   }
   const gutter = Math.min(192, Math.max(24, viewport.width * 0.15));
@@ -411,8 +433,9 @@ function App() {
   const maxHeightPct = Math.floor((maxBoardHeight / 1100) * 100);
   const activeNotes = notes.filter((n) => !n.deleted_at && !n.deleted);
   const activeStrokes = strokes.filter((s) => !s.deleted_at && !s.deleted);
-  const rawMinBoardWidth = Math.max(400, ...activeNotes.map((n) => Number(n.x || 0) + 235 + 36), ...activeStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.x ?? p[0]) + Number(s.width || 0) / 2 + 18)));
-  const rawMinBoardHeight = Math.max(400, ...activeNotes.map((n) => Number(n.y || 0) + 174 + 36), ...activeStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.y ?? p[1]) + Number(s.width || 0) / 2 + 18)));
+  const boardStrokes = activeStrokes.filter(s => !s.note_id);
+  const rawMinBoardWidth = Math.max(400, ...activeNotes.map((n) => Number(n.x || 0) + 235 + 36), ...boardStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.x ?? p[0]) + Number(s.width || 0) / 2 + 18)));
+  const rawMinBoardHeight = Math.max(400, ...activeNotes.map((n) => Number(n.y || 0) + 174 + 36), ...boardStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.y ?? p[1]) + Number(s.width || 0) / 2 + 18)));
   const minBoardWidth = Number.isFinite(rawMinBoardWidth) ? rawMinBoardWidth : 400;
   const minBoardHeight = Number.isFinite(rawMinBoardHeight) ? rawMinBoardHeight : 400;
   const minWidthPct = Number.isFinite(minBoardWidth) ? Math.ceil((minBoardWidth / 1600) * 100) : 25;
@@ -511,7 +534,7 @@ function App() {
             onDrop={restoreFromDrop}
           >
             <DrawLayer
-              strokes={strokes}
+              strokes={activeStrokes.filter(s => !s.note_id)}
               tool={tool}
               color={markerColor}
               eraserSize={eraserSize}
@@ -520,12 +543,15 @@ function App() {
               zoom={sceneScale}
               width={board.width}
               height={board.height}
+              notes={activeNotes}
             />
             {notes.map((n) => (
               <Note
                 key={n.id}
                 n={n}
                 zoom={sceneScale}
+                tool={tool}
+                strokes={activeStrokes.filter(s => s.note_id === n.id).map(s => ({...s, points: s.points.map(p => ({x:p.x - n.x, y:p.y - n.y}))}))}
                 onUpdate={update}
                 onDelete={remove}
               />

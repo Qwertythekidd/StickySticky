@@ -101,9 +101,11 @@ class Handler(SimpleHTTPRequestHandler):
                 for item in originals: c.execute("UPDATE strokes SET deleted_at=?,version=version+1 WHERE id=?", (now,item["id"]))
                 made=[]
                 for item in fragments:
-                    sid=item.get("id",str(uuid.uuid4())); c.execute("INSERT INTO strokes(id,points,color,width) VALUES(?,?,?,?)",(sid,json.dumps(item["points"]),item["color"],float(item["width"]))); made.append(sid)
+                    sid=item.get("id",str(uuid.uuid4())); note_id=item.get("note_id")
+                    if note_id is not None and c.execute("SELECT 1 FROM notes WHERE id=?", (note_id,)).fetchone() is None: raise ValueError("invalid_note_id")
+                    c.execute("INSERT INTO strokes(id,points,color,width,note_id) VALUES(?,?,?,?,?)",(sid,json.dumps(item["points"]),item["color"],float(item["width"]),note_id)); made.append(sid)
                 c.commit(); self.send_json(201,{"fragments":[dict(c.execute("SELECT * FROM strokes WHERE id=?",(sid,)).fetchone()) for sid in made]})
-            except ValueError: c.rollback(); self.send_json(409,{"error":"conflict"})
+            except ValueError as e: c.rollback(); self.send_json(409 if str(e)=="conflict" else 400,{"error":str(e)})
         elif p == ["api","strokes"]:
             if not isinstance(payload.get("points"), list): self.send_json(400,{"error":"points_required"})
             else:
@@ -130,7 +132,7 @@ class Handler(SimpleHTTPRequestHandler):
             limits = {"width": scene["scene_width"] - scene["board_x"] - 1600, "height": scene["scene_height"] - scene["board_y"] - 1100}
             # Never shrink the board around active content; deleted rows are excluded.
             notes = c.execute("SELECT x,y FROM notes WHERE deleted_at IS NULL").fetchall()
-            strokes = c.execute("SELECT points,width FROM strokes WHERE deleted_at IS NULL").fetchall()
+            strokes = c.execute("SELECT points,width FROM strokes WHERE deleted_at IS NULL AND note_id IS NULL").fetchall()
             min_w = max([float(n[0]) + 235 + 36 for n in notes] or [400])
             min_h = max([float(n[1]) + 174 + 36 for n in notes] or [400])
             for s in strokes:

@@ -7,7 +7,7 @@ import server
 class BackendTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); path = Path(self.tmp.name) / 'notes.db'
-        c = server.db(path); c.execute("INSERT INTO notes VALUES(?,?,?,?,?,?,?,?,?,?)", ('legacy','Old','kept','blue','✦',4,5,0,7,None)); c.commit(); c.close()
+        c = server.db(path); c.execute("INSERT INTO notes(id,title,body,color,stamp,x,y,done,version,deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?)", ('legacy','Old','kept','blue','✦',4,5,0,7,None)); c.commit(); c.close()
         self.http = ThreadingHTTPServer(('127.0.0.1', 0), lambda *a, **kw: server.Handler(*a, db_path=path, **kw)); self.thread = threading.Thread(target=self.http.serve_forever, daemon=True); self.thread.start(); self.conn = HTTPConnection(*self.http.server_address)
     def tearDown(self): self.http.shutdown(); self.http.server_close(); self.tmp.cleanup()
     def request(self, method, path, body=None):
