@@ -380,7 +380,13 @@ function App() {
   function ownership(points, ns) {
     const segments = [];
     let current = null, bucket = [];
-    const owner = (p) => [...ns].reverse().find(n => p.x >= n.x && p.x <= n.x + 235 && p.y >= n.y && p.y <= n.y + 174)?.id || null;
+    const owner = (p) => [...ns].reverse().find(n => {
+      const boardSvg = document.querySelector("svg.draw");
+      const noteSvg = document.querySelector(`[data-note-id="${n.id}"] svg.note-ink`);
+      const fromBoard = boardSvg?.getScreenCTM(), toLocal = noteSvg?.getScreenCTM()?.inverse();
+      const q = fromBoard && toLocal ? new DOMPoint(p.x, p.y).matrixTransform(fromBoard).matrixTransform(toLocal) : { x:p.x-n.x, y:p.y-n.y };
+      return q.x >= 0 && q.x <= 235 && q.y >= 0 && q.y <= 174;
+    })?.id || null;
     const routed = points.length < 2 ? points : [points[0], ...points.slice(1).flatMap((p, i) => {
       const a = points[i], dx = p.x-a.x, dy = p.y-a.y, ts = [1];
       for (const n of ns) for (const [axis, value] of [["x",n.x],["x",n.x+235],["y",n.y],["y",n.y+174]]) {
