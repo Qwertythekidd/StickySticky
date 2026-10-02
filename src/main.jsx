@@ -388,7 +388,7 @@ function App() {
       }
       return ts.sort((x,y)=>x-y).slice(0,-1).map(t=>({x:a.x+dx*t,y:a.y+dy*t})).concat(p);
     })];
-    for (const p of routed) { const next = owner(p); if (next !== current && bucket.length) { if (bucket.length > 1) segments.push({note_id: current, points: bucket}); bucket = [bucket.at(-1), p]; } else bucket.push(p); current = next; }
+    for (const p of routed) { const next = owner(p); if (next !== current && bucket.length) { if (bucket.length > 1) segments.push({note_id: current, points: bucket}); bucket = [p]; } else bucket.push(p); current = next; }
     if (bucket.length > 1) segments.push({note_id: current, points: bucket});
     return segments;
   }
@@ -411,7 +411,10 @@ function App() {
       } catch { setConflict(true); }
       return;
     }
-    const pieces = ownership(points, ns);
+    const pieces = ownership(points, ns).map(piece => {
+      const note = piece.note_id && ns.find(n => n.id === piece.note_id);
+      return note ? {...piece, points: piece.points.map(p => ({x:p.x-note.x,y:p.y-note.y}))} : piece;
+    });
     try {
       const saved = await Promise.all(pieces.map(piece => api("/strokes", { method: "POST", body: JSON.stringify({...piece, color: colorRef.current, width: markerRef.current}) })));
       setStrokes((x) => [...x, ...saved]); history.current.push({type:"draw", strokes:saved});
@@ -552,7 +555,7 @@ function App() {
                 n={n}
                 zoom={sceneScale}
                 tool={tool}
-                strokes={activeStrokes.filter(s => s.note_id === n.id).map(s => ({...s, points: s.points.map(p => ({x:p.x - n.x, y:p.y - n.y}))}))}
+                strokes={activeStrokes.filter(s => s.note_id === n.id)}
                 onUpdate={update}
                 onDelete={remove}
               />
