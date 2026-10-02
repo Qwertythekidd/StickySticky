@@ -395,11 +395,13 @@ function App() {
     if (bucket.length > 1) segments.push({note_id: current, points: bucket});
     return segments;
   }
-  const noteAngle = (n) => ((((String(n.id).charCodeAt(0) || 3) % 7) - 3) * Math.PI) / 180;
   const toNoteLocal = (p, n) => {
-    const a = noteAngle(n), cx = 117.5, cy = 87;
-    const x = p.x - n.x - cx, y = p.y - n.y - cy;
-    return { x: x * Math.cos(a) - y * Math.sin(a) + cx, y: x * Math.sin(a) + y * Math.cos(a) + cy };
+    const boardSvg = document.querySelector("svg.draw");
+    const noteSvg = document.querySelector(`[data-note-id="${n.id}"] svg.note-ink`);
+    const fromBoard = boardSvg?.getScreenCTM();
+    const toLocal = noteSvg?.getScreenCTM()?.inverse();
+    if (!fromBoard || !toLocal) return { x: p.x - n.x, y: p.y - n.y };
+    return new DOMPoint(p.x, p.y).matrixTransform(fromBoard).matrixTransform(toLocal);
   };
   async function draw(points, mode, ns) {
     if (mode === "eraser") {
