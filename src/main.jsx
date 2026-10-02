@@ -86,18 +86,16 @@ function Note({ n, onUpdate, onDelete, zoom }) {
           false,
         )
       }
-      onPointerUp={() => {
+      onPointerUp={(e) => {
         if (drag.current) {
-          onUpdate(n, { x: n.x, y: n.y });
+          if (document.elementFromPoint(e.clientX,e.clientY)?.closest("[data-trash]")) onDelete(n);
+          else onUpdate(n, { x: n.x, y: n.y });
           drag.current = null;
         }
       }}
     >
       <div className="grab">
         ⠿{" "}
-        <button className="del" onClick={() => onDelete(n)}>
-          ×
-        </button>
       </div>
       <h3
         contentEditable
@@ -603,6 +601,7 @@ function App() {
         <b>{Math.round(zoom * 100)}%</b>
         <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))}>＋</button>
       </div>
+      <div className="trash-drop" data-trash role="button" aria-label="Trash notes">🗑</div>
       {shrinkHint && <div className="board-size-notice" role="status">{shrinkHint}</div>}
     </div>
   );
