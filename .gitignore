@@ -18,5 +18,7 @@ node_modules/
 # Generated/build artifacts
 dist/
 build/
+.pkg/
 .cache/
+backups/
 .DS_Store

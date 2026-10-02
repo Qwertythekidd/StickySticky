@@ -1,9 +1,10 @@
 #!/bin/sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-VERSION=${1:-0.1.0}; OUT="$ROOT/dist"; PKG="$OUT/sticky-sticky_${VERSION}_all"
+VERSION=${1:-0.1.0}; OUT="$ROOT/dist"; PKG="$ROOT/.pkg/sticky-sticky_${VERSION}_all"
 rm -rf "$PKG"; mkdir -p "$PKG/DEBIAN" "$PKG/usr/lib/sticky-sticky" "$PKG/usr/bin" "$PKG/usr/share/applications"
-cp "$ROOT/index.html" "$ROOT/server.py" "$ROOT/README.md" "$PKG/usr/lib/sticky-sticky/"
+cp "$ROOT/server.py" "$ROOT/README.md" "$PKG/usr/lib/sticky-sticky/"
+cp -R "$ROOT/dist/." "$PKG/usr/lib/sticky-sticky/"
 cp "$ROOT/packaging/sticky-sticky" "$PKG/usr/bin/sticky-sticky"; chmod 755 "$PKG/usr/bin/sticky-sticky"
 cp "$ROOT/packaging/Sticky-Sticky.desktop" "$PKG/usr/share/applications/Sticky-Sticky.desktop"
 cat > "$PKG/DEBIAN/control" <<EOF
