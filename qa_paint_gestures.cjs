@@ -1,0 +1,35 @@
+const { chromium } = require('playwright');
+const { execFile } = require('child_process');
+const fs = require('fs');
+const port = 18941;
+const base = `http://127.0.0.1:${port}`;
+const dataDir = `/tmp/sticky-sticky-paint-${process.pid}`;
+fs.rmSync(dataDir, { recursive: true, force: true }); fs.mkdirSync(dataDir, { recursive: true });
+const server = execFile('python3', ['server.py'], { env: {...process.env, STICKY_STICKY_PORT:String(port), STICKY_STICKY_DATA_DIR:dataDir} });
+const events=[]; const wait = ms => new Promise(r=>setTimeout(r,ms));
+async function req(path, options={}) { const r=await fetch(base+path, options); const body=await r.text(); events.push({method:options.method||'GET',path,status:r.status,body}); if(!r.ok) throw Error(`${options.method||'GET'} ${path} -> ${r.status} ${body}`); return body?JSON.parse(body):null; }
+(async()=>{
+  await wait(500); const browser=await chromium.launch({headless:true, executablePath:'/usr/bin/brave-browser'}); const page=await browser.newPage({viewport:{width:1200,height:800}});
+  const requestEvents=[]; page.on('request', r=>{if(r.url().includes('/api/strokes')) requestEvents.push({kind:'request',method:r.method(),url:r.url(),body:r.postData()})}); page.on('response', async r=>{if(r.url().includes('/api/strokes')) requestEvents.push({kind:'response',status:r.status(),url:r.url()})});
+  const errors=[]; page.on('pageerror',e=>errors.push('PAGEERROR '+e.stack)); page.on('console',m=>m.type()==='error'&&errors.push('CONSOLE '+m.text())); page.on('request',r=>{if(r.url().endsWith('/api/board')&&r.method()==='PUT') errors.push('BOARDPUT '+r.postData())}); page.on('response',async r=>{if(r.status()===400) errors.push('HTTP400 '+r.url()+' '+await r.text())});
+  const seed=await req('/api/strokes',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({points:Array.from({length:101},(_,i)=>({x:240+i*3.6,y:300})),color:'#2367d1',width:8})});
+  const initBodies={board:await req('/api/board'),scene:await req('/api/scene'),notes:await req('/api/notes')}; await page.goto(base+'/',{waitUntil:'networkidle'}); const board=await page.locator('.board').boundingBox();
+  await page.locator('.toolbar > button').filter({hasText:'Marker'}).evaluate(el=>el.click()); await page.waitForSelector('.marker-pop'); await page.locator('input[aria-label="Custom marker color"]').fill('#e24a9b'); await page.locator('input[aria-label="Marker diameter"]').fill('11');
+  const drawBox=await page.locator('.draw').boundingBox(); const x=drawBox.x+drawBox.width*0.55,y=drawBox.y+drawBox.height*0.55; await page.mouse.move(x,y); await page.mouse.down(); await page.mouse.move(x+Math.max(2,drawBox.width*0.08),y+Math.max(2,drawBox.height*0.04)); await page.waitForTimeout(50);
+  const provisional=await page.locator('.draw path').evaluateAll(ps=>ps.map(p=>({stroke:p.getAttribute('stroke'),width:p.getAttribute('stroke-width'),d:p.getAttribute('d')})));
+  if(!provisional.some(p=>p.stroke==='#e24a9b'&&p.width==='11'&&p.d)) throw Error('held pointer did not render provisional custom-color/width path');
+  await page.mouse.up(); const drawn=await req('/api/strokes'); if(drawn.length!==2) throw Error(`draw GET expected 2, got ${drawn.length}`); const fresh=drawn.find(s=>s.id!==seed.id); if(fresh.color!=='#e24a9b'||fresh.width!==11) throw Error('draw persisted wrong style');
+  await page.reload({waitUntil:'networkidle'}); if((await req('/api/strokes')).length!==2) throw Error('draw lost after reload');
+  const markerButton=page.getByRole('button',{name:/Marker/}).first(); await markerButton.waitFor({state:'visible'}); await markerButton.evaluate(el=>el.click()); await page.locator('.marker-pop').last().waitFor({state:'visible'}); await page.getByRole('button',{name:'Eraser',exact:true}).evaluate(el=>el.click());
+  const targetScreen=await page.locator('.draw path[stroke="#2367d1"]').evaluate(p=>{const l=p.getTotalLength(),a=p.getPointAtLength(l*.5),b=p.getPointAtLength(l*.5-1),c=p.getPointAtLength(l*.5+1),m=p.getScreenCTM(); const tr=q=>new DOMPoint(q.x,q.y).matrixTransform(m); const A=tr(a),B=tr(b),C=tr(c); const tx=C.x-B.x,ty=C.y-B.y,n=Math.hypot(tx,ty)||1; return {x:A.x,y:A.y,nx:-ty/n,ny:tx/n,length:l};});
+  const cutX=targetScreen.x,cutY=targetScreen.y,half=28; const p1={x:cutX-targetScreen.nx*half,y:cutY-targetScreen.ny*half},p2={x:cutX+targetScreen.nx*half,y:cutY+targetScreen.ny*half}; await page.mouse.move(p1.x,p1.y); await page.mouse.down(); await page.mouse.move(p2.x,p2.y); await page.mouse.up();
+  const afterErase=await req('/api/strokes'); const originals=afterErase.filter(s=>s.id===seed.id); const fragments=afterErase.filter(s=>s.color==='#2367d1'); if(originals.length!==0||fragments.length!==2) throw Error(`erase expected 2 target fragments and no original, got ${afterErase.length}`);
+  if(fragments.some(s=>s.color!=='#2367d1'||s.width!==8)) throw Error('erase changed fragment style');
+  const gap=fragments.map(s=>s.points).flat().map(p=>p.x); if(!(Math.min(...gap)<330&&Math.max(...gap)>330)) throw Error('sparse line fragments do not show a midpoint gap');
+  await Promise.all([page.waitForResponse(r=>r.url().includes('/api/strokes/'+seed.id)&&r.request().method()==='PATCH'),page.getByRole('button',{name:'↶ Undo'}).click()]); const restored=await req('/api/strokes'); const exact=restored.find(s=>s.id===seed.id); const norm=s=>(s||[]).map(p=>[Number(p.x??p[0]),Number(p.y??p[1])]); if(!exact||JSON.stringify(norm(exact.points))!==JSON.stringify(norm(seed.points))||exact.color!==seed.color||Number(exact.width)!==Number(seed.width)||exact.deleted) throw Error('undo did not restore geometry/style/active state: '+JSON.stringify({seed,exact,restored}));
+  const reload=await req('/api/strokes'); await page.reload({waitUntil:'networkidle'}); const rendered=await page.locator('.draw path').count();
+  const tombstones=await req('/api/strokes'); if(tombstones.length!==2||rendered!==2) throw Error('undo reload rendered wrong stroke count');
+  const cursor=await page.locator('.draw circle').evaluate(c=>({visibility:getComputedStyle(c).visibility,r:c.getAttribute('r'),pointer:c.getAttribute('pointer-events')}));
+  console.log(JSON.stringify({pass:true,initBodies,servedHash:await (await fetch(base+'/assets/index.js')).status,seed,provisional:provisional.filter(p=>p.stroke==='#e24a9b'),drawn,afterErase,restored,tombstones,rendered,cursor,requestEvents,events,errors}));
+  await browser.close(); server.kill(); fs.rmSync(dataDir,{recursive:true,force:true});
+})().catch(e=>{console.error(e.stack||e); try{server.kill()}catch{}; process.exitCode=1});

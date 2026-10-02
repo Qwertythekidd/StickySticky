@@ -9,6 +9,7 @@ const Board = forwardRef(function Board(
     width,
     height,
     frameStyle,
+    overflowEdges = {},
     title,
     subtitle,
     onTitleChange,
@@ -28,7 +29,7 @@ const Board = forwardRef(function Board(
   return (
     <div
       ref={ref}
-      className={`board frame-${frameStyle}`}
+      className={`board frame-${frameStyle} ${Object.entries(overflowEdges).filter(([,v]) => v).map(([k]) => `overflow-${k}`).join(" ")}`}
       style={{ width, height }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

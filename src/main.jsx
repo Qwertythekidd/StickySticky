@@ -450,11 +450,10 @@ function App() {
   const boardStrokes = activeStrokes.filter(s => !s.note_id);
   const rawMinBoardWidth = Math.max(400, ...activeNotes.map((n) => Number(n.x || 0) + 235 + 36), ...boardStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.x ?? p[0]) + Number(s.width || 0) / 2 + 18)));
   const rawMinBoardHeight = Math.max(400, ...activeNotes.map((n) => Number(n.y || 0) + 174 + 36), ...boardStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.y ?? p[1]) + Number(s.width || 0) / 2 + 18)));
-  const minBoardWidth = Number.isFinite(rawMinBoardWidth) ? rawMinBoardWidth : 400;
-  const minBoardHeight = Number.isFinite(rawMinBoardHeight) ? rawMinBoardHeight : 400;
-  const minWidthPct = Number.isFinite(minBoardWidth) ? Math.ceil((minBoardWidth / 1600) * 100) : 25;
-  const minHeightPct = Number.isFinite(minBoardHeight) ? Math.ceil((minBoardHeight / 1100) * 100) : 25;
-  const shrinkHint = shrinkNotice || (widthPct <= minWidthPct || heightPct <= minHeightPct ? "Move content inward to shrink further." : "");
+  const minBoardWidth = 400, minBoardHeight = 400;
+  const minWidthPct = 25, minHeightPct = 25;
+  const overflowEdges = { left: activeNotes.some(n => Number(n.x || 0) < 0), right: activeNotes.some(n => Number(n.x || 0) + 235 > board.width), top: activeNotes.some(n => Number(n.y || 0) < 0), bottom: activeNotes.some(n => Number(n.y || 0) + 174 > board.height) };
+  const shrinkHint = shrinkNotice || "";
   const maxPanX = Math.max(0, (sceneWidth - viewport.width) / 2);
   const maxPanY = Math.max(0, (sceneHeight - viewport.height) / 2);
   const clampPan = (p) => ({
@@ -522,6 +521,7 @@ function App() {
             width={board.width}
             height={board.height}
             frameStyle={sceneConfig.frame_style}
+            overflowEdges={overflowEdges}
             title={board.title}
             subtitle={board.subtitle}
             onTitleChange={(e) => setBoard({ ...board, title: e.target.value })}
@@ -673,6 +673,7 @@ function App() {
         <button onClick={() => setHeightPct(Math.max(minHeightPct, heightPct - 10))} disabled={heightPct <= minHeightPct} title={heightPct <= minHeightPct ? "Move content inward to shrink further" : "Shrink board height"}>−</button>
         <b>{heightPct}%</b>
         <button onClick={() => setHeightPct(Math.min(maxHeightPct, heightPct + 10))} disabled={heightPct >= maxHeightPct}>＋</button>
+        <button onClick={() => { setWidthPct(100); setHeightPct(100); }} title="Reset board size">Reset</button>
         <i />
         <span>Zoom</span>
         <button onClick={() => setZoom(Math.max(0.45, zoom - 0.1))}>−</button>
