@@ -289,6 +289,10 @@ function App() {
   const sceneScale = Math.min(1, fit) * zoom;
   const sceneWidth = (board.width + 36) * sceneScale;
   const sceneHeight = (board.height + 36) * sceneScale;
+  const maxBoardWidth = Math.max(400, sceneConfig.scene_width - sceneConfig.board_x - 1600);
+  const maxBoardHeight = Math.max(400, sceneConfig.scene_height - sceneConfig.board_y - 1100);
+  const maxWidthPct = Math.floor((maxBoardWidth / 1600) * 100);
+  const maxHeightPct = Math.floor((maxBoardHeight / 1100) * 100);
   const maxPanX = Math.max(0, (sceneWidth - (viewport.width - gutter * 2)) / 2);
   const maxPanY = Math.max(0, (sceneHeight - (viewport.height - gutter * 2)) / 2);
   const clampPan = (p) => p;
@@ -306,13 +310,15 @@ function App() {
   };
   useEffect(() => setPan((p) => clampPan(p)), [zoom, viewport, board.width, board.height]);
   useEffect(() => {
-    const next = Math.round(1600 * widthPct / 100);
-    const nextHeight = Math.round(1100 * heightPct / 100);
+    if (widthPct > maxWidthPct) setWidthPct(maxWidthPct);
+    if (heightPct > maxHeightPct) setHeightPct(maxHeightPct);
+    const next = Math.min(maxBoardWidth, Math.round(1600 * widthPct / 100));
+    const nextHeight = Math.min(maxBoardHeight, Math.round(1100 * heightPct / 100));
     if (board.width !== next || board.height !== nextHeight) {
       setBoard((b) => ({ ...b, width: next, height: nextHeight }));
       saveBoard({ width: next, height: nextHeight });
     }
-  }, [widthPct, heightPct]);
+  }, [widthPct, heightPct, maxBoardWidth, maxBoardHeight]);
   async function updateScene(patch) {
     const next = { ...sceneConfig, ...patch };
     try { setSceneConfig(await api("/scene", { method: "PUT", body: JSON.stringify({ ...next, version: sceneConfig.version }) })); }
@@ -444,13 +450,13 @@ function App() {
           −
         </button>
         <b>{widthPct}%</b>
-        <button onClick={() => setWidthPct(Math.min(10000, widthPct + 10))}>
+        <button onClick={() => setWidthPct(Math.min(maxWidthPct, widthPct + 10))} disabled={widthPct >= maxWidthPct}>
           ＋
         </button>
         <span>Height</span>
         <button onClick={() => setHeightPct(Math.max(25, heightPct - 10))}>−</button>
         <b>{heightPct}%</b>
-        <button onClick={() => setHeightPct(Math.min(10000, heightPct + 10))}>＋</button>
+        <button onClick={() => setHeightPct(Math.min(maxHeightPct, heightPct + 10))} disabled={heightPct >= maxHeightPct}>＋</button>
         <i />
         <span>Zoom</span>
         <button onClick={() => setZoom(Math.max(0.45, zoom - 0.1))}>−</button>

@@ -69,7 +69,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.parts() != ["api","board"]: self.send_error(404); return
         payload = self.read_body()
         if payload is None: return
-        c = db(self.db_path); row = c.execute("SELECT * FROM board_settings WHERE id=1").fetchone()
+        c = db(self.db_path); row = c.execute("SELECT * FROM board_settings WHERE id=1").fetchone(); scene = c.execute("SELECT * FROM scene_settings WHERE id=1").fetchone()
         if payload.get("version") is not None and int(payload["version"]) != row["version"]: self.send_json(409,{"error":"conflict","current_version":row["version"]})
         else:
             vals = {k:payload[k] for k in ("title","subtitle","width","height") if k in payload}
@@ -79,6 +79,10 @@ class Handler(SimpleHTTPRequestHandler):
                     except (TypeError, ValueError): value = 0
                     if not math.isfinite(value) or value < 400 or value > 10000000:
                         self.send_json(400, {"error": f"invalid_{key}"}); c.close(); return
+            limits = {"width": scene["scene_width"] - scene["board_x"] - 1600, "height": scene["scene_height"] - scene["board_y"] - 1100}
+            for key, limit in limits.items():
+                if key in vals and float(vals[key]) > limit:
+                    self.send_json(400, {"error": f"board_{key}_outside_scene", "max": limit}); c.close(); return
             if vals: c.execute("UPDATE board_settings SET " + ",".join(f"{k}=?" for k in vals) + ",version=version+1 WHERE id=1", (*vals.values(),)); c.commit()
             self.send_json(200,dict(c.execute("SELECT title,subtitle,width,height,version FROM board_settings WHERE id=1").fetchone()))
         c.close()
