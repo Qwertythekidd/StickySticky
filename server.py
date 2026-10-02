@@ -171,7 +171,7 @@ class Handler(SimpleHTTPRequestHandler):
         if payload is None: return
         if len(p) != 3 or p[:2] != ["api", p[1]] or p[1] not in {"notes","strokes"}: self.send_error(404); return
         table, item = p[1], p[2]; c = db(self.db_path); row = c.execute(f"SELECT * FROM {table} WHERE id=?",(item,)).fetchone()
-        if row is None or (row["deleted_at"] is not None and not payload.get("restore")): self.send_error(404); c.close(); return
+        if row is None or (row["deleted_at"] is not None and not payload.get("restore") and not payload.get("clear")): self.send_error(404); c.close(); return
         if payload.get("version") is not None and int(payload["version"]) != row["version"]: self.send_json(409,{"error":"conflict","current_version":row["version"]}); c.close(); return
         allowed = {"title","body","color","stamp","x","y","done"} if table == "notes" else {"points","color","width"}; vals = {k:payload[k] for k in allowed if k in payload}
         if table == "notes" and payload.get("clear"): vals["cleared_at"] = utc_now()
