@@ -1,0 +1,21 @@
+# Live local database and SQLite sidecars
+notes.db
+notes.db-wal
+notes.db-shm
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Python/runtime caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated/build artifacts
+dist/
+build/
+.cache/
+.DS_Store
