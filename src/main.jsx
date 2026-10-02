@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import Board from "./Board.jsx";
 import { clipPolyline } from "./eraseGeometry.js";
+import { splitOwnedPolyline } from "./routeGeometry.js";
 import "./styles.css";
 const seed = [
   [
@@ -378,8 +379,6 @@ function App() {
     return Math.min(dist(a,c,d),dist(b,c,d),dist(c,a,b),dist(d,a,b));
   };
   function ownership(points, ns) {
-    const segments = [];
-    let current = null, bucket = [];
     const owner = (p) => [...ns].reverse().find(n => {
       const boardSvg = document.querySelector("svg.draw");
       const noteSvg = document.querySelector(`[data-note-id="${n.id}"] svg.note-ink`);
@@ -387,13 +386,13 @@ function App() {
       const q = fromBoard && toLocal ? new DOMPoint(p.x, p.y).matrixTransform(fromBoard).matrixTransform(toLocal) : { x:p.x-n.x, y:p.y-n.y };
       return q.x >= 0 && q.x <= 235 && q.y >= 0 && q.y <= 174;
     })?.id || null;
-    const routed = points.length < 2 ? points : [points[0], ...points.slice(1).flatMap((p, i) => {
-      const a = points[i], steps = 24;
-      return Array.from({length:steps}, (_, j) => { const t=(j+1)/steps; return {x:a.x+(p.x-a.x)*t,y:a.y+(p.y-a.y)*t}; });
-    })];
-    for (const p of routed) { const next = owner(p); if (next !== current && bucket.length) { if (bucket.length > 1) segments.push({note_id: current, points: bucket}); bucket = [p]; } else bucket.push(p); current = next; }
-    if (bucket.length > 1) segments.push({note_id: current, points: bucket});
-    return segments;
+    if (points.length < 2) return points.length ? [{note_id: owner(points[0]), points}] : [];
+    return splitOwnedPolyline(points, ns, (p, n) => {
+      const boardSvg = document.querySelector("svg.draw");
+      const noteSvg = document.querySelector(`[data-note-id="${n.id}"] svg.note-ink`);
+      const fromBoard = boardSvg?.getScreenCTM(), toLocal = noteSvg?.getScreenCTM()?.inverse();
+      return fromBoard && toLocal ? new DOMPoint(p.x, p.y).matrixTransform(fromBoard).matrixTransform(toLocal) : {x:p.x-n.x,y:p.y-n.y};
+    }, q => q.x >= 0 && q.x <= 235 && q.y >= 0 && q.y <= 174);
   }
   const toNoteLocal = (p, n) => {
     const boardSvg = document.querySelector("svg.draw");
@@ -406,7 +405,7 @@ function App() {
   async function draw(points, mode, ns) {
     if (mode === "eraser") {
       const radius = eraserRef.current / 2;
-      const surface = ownership(points.slice(0, 1), ns)[0]?.note_id || null;
+      const surface = ownership(points.slice(0, 2), ns)[0]?.note_id || null;
       const surfaceNote = surface && ns.find(n => n.id === surface);
       const localEraser = surfaceNote ? points.map(p => toNoteLocal(p, surfaceNote)) : points;
       const fragments=[]; const hit=[];

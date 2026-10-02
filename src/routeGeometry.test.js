@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { splitOwnedPolyline } from "./routeGeometry.js";
+const p=(x,y)=>({x,y});
+const note=(id, f, z=0)=>({id,z,f});
+const inside=q=>q.x>=0&&q.x<=235&&q.y>=0&&q.y<=174;
+const run=(points, notes)=>splitOwnedPolyline(points,notes,(p,n)=>n.f(p),inside);
+let r=run([p(-20,50),p(300,50)],[note("a",p=>p)]);
+assert.equal(r.length,3); assert.deepEqual(r.map(x=>[x.note_id,x.points[0].x,x.points.at(-1).x]),[[null,-20,0],["a",0,235],[null,235,300]]);
+r=run([p(-20,20),p(300,20)],[note("a",q=>q),note("b",q=>({x:q.x-1,y:q.y-1}))]);
+assert.deepEqual(r.map(x=>x.note_id),[null,"a","b",null]);
+r=run([p(20,20),p(220,20),p(20,20)],[note("a",p=>p)]);
+assert.equal(r.length,1); assert.ok(Math.abs(r[0].points.at(-1).x-20)<1e-9);
+const c=Math.cos(Math.PI/4),s=Math.sin(Math.PI/4);
+r=run([p(-200,117),p(200,117)],[note("rot",q=>p((q.x-117)*c+(q.y-117)*s+117, -(q.x-117)*s+(q.y-117)*c+117))]);
+assert.equal(r.filter(x=>x.note_id==='rot').length,1); assert.ok(r.find(x=>x.note_id==='rot').points.length>=2);
+console.log('routeGeometry tests: exact edges, overlap, re-entry, rotation passed');
