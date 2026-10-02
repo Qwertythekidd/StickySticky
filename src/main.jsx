@@ -545,7 +545,7 @@ function App() {
       {trashOpen && <aside className="trash-tray" aria-label="Trash">
         <strong>Trash</strong>
         <div className="trash-list">{trash.map(n => <button key={n.id} draggable className="trash-item" onDragStart={e => e.dataTransfer.setData("text/sticky-id", n.id)} onClick={async () => { try { const restored = await api("/notes/" + n.id, { method:"PATCH", body:JSON.stringify({restore:true,version:n.version+1}) }); setNotes(x=>[...x,restored]); setTrash(x=>x.filter(v=>v.id!==n.id)); } catch { setConflict(true); } }}>{n.title || "Untitled note"}</button>)}</div>
-        <button className="empty-trash" disabled title="Permanent deletion requires explicit authorization">Empty Trash</button>
+        <button className="empty-trash" disabled={!trash.length} style={{color:"#a11",fontWeight:700}} onClick={async () => { if (!window.confirm(`Remove ${trash.length} note${trash.length === 1 ? "" : "s"} from Trash? Content remains stored.`)) return; try { for (const n of trash) await api("/notes/" + n.id, { method:"PATCH", body:JSON.stringify({clear:true,version:n.version+1}) }); setTrash([]); } catch { setConflict(true); } }}>Empty Trash</button>
       </aside>}
       <div className="toolbar">
         <button className="new" onClick={() => { setOpen(x=>!x); setTool("select"); }}>
