@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-import json, sqlite3, uuid
+import json, sqlite3, uuid, os
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-ROOT=Path(__file__).parent; DB=ROOT/'notes.db'
+ROOT=Path(__file__).parent
+DATA=Path(os.environ.get('STICKY_STICKY_DATA_DIR', Path(os.environ.get('XDG_DATA_HOME', Path.home()/'.local/share'))/'sticky-sticky'))
+DATA.mkdir(parents=True, exist_ok=True)
+DB=DATA/'notes.db'
 def db():
     c=sqlite3.connect(DB); c.row_factory=sqlite3.Row
     c.execute('''create table if not exists notes(id text primary key,title text not null,body text not null,color text not null,stamp text not null,x real not null,y real not null,done integer not null default 0,version integer not null default 1,deleted_at text)'''); c.commit(); return c
@@ -29,4 +32,5 @@ class H(SimpleHTTPRequestHandler):
     def do_DELETE(self):
         if not self.path.startswith('/api/notes/'): self.send_error(404); return
         nid=self.path.split('/')[-1]; c=db(); c.execute("update notes set deleted_at=datetime('now'),version=version+1 where id=?",(nid,)); c.commit(); self.send_json(200,{'deleted':nid}); c.close()
-if __name__=='__main__': db().close(); print('Cort board at http://127.0.0.1:8765'); ThreadingHTTPServer(('127.0.0.1',8765),H).serve_forever()
+if __name__=='__main__':
+    port=int(os.environ.get('STICKY_STICKY_PORT','8765')); db().close(); print(f'Sticky-Sticky at http://127.0.0.1:{port}'); ThreadingHTTPServer(('127.0.0.1',port),H).serve_forever()

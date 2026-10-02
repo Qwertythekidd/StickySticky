@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+APP_ROOT=/usr/lib/sticky-sticky
+PORT="${STICKY_STICKY_PORT:-8765}"
+DATA_DIR="${STICKY_STICKY_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/sticky-sticky}"
+mkdir -p "$DATA_DIR"
+python3 "$APP_ROOT/server.py" >/tmp/sticky-sticky-server.log 2>&1 &
+SERVER_PID=$!
+trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT INT TERM
+for i in $(seq 1 50); do curl -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1 && break; sleep .1; done
+CHROME="${STICKY_STICKY_BROWSER:-chromium}"
+exec "$CHROME" --app="http://127.0.0.1:$PORT/" --user-data-dir="${XDG_CACHE_HOME:-$HOME/.cache}/sticky-sticky/browser" "$@"
