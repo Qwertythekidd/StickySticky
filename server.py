@@ -83,6 +83,17 @@ class Handler(SimpleHTTPRequestHandler):
                     if not math.isfinite(value) or value < 400 or value > 10000000:
                         self.send_json(400, {"error": f"invalid_{key}"}); c.close(); return
             limits = {"width": scene["scene_width"] - scene["board_x"] - 1600, "height": scene["scene_height"] - scene["board_y"] - 1100}
+            # Never shrink the board around active content; deleted rows are excluded.
+            notes = c.execute("SELECT x,y FROM notes WHERE deleted_at IS NULL").fetchall()
+            strokes = c.execute("SELECT points,width FROM strokes WHERE deleted_at IS NULL").fetchall()
+            min_w = max([float(n[0]) + 235 + 36 for n in notes] or [400])
+            min_h = max([float(n[1]) + 174 + 36 for n in notes] or [400])
+            for s in strokes:
+                pts = json.loads(s[0]); pad = float(s[1]) / 2 + 18
+                if pts: min_w = max(min_w, max(float(p[0]) for p in pts) + pad); min_h = max(min_h, max(float(p[1]) for p in pts) + pad)
+            for key, minimum in (("width", min_w), ("height", min_h)):
+                if key in vals and float(vals[key]) < minimum:
+                    self.send_json(400, {"error": f"board_{key}_clips_content", "min": minimum}); c.close(); return
             for key, limit in limits.items():
                 if key in vals and float(vals[key]) > limit:
                     self.send_json(400, {"error": f"board_{key}_outside_scene", "max": limit}); c.close(); return
