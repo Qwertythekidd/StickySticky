@@ -151,6 +151,7 @@ function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom,
     <svg
       ref={ref}
       className="draw"
+      style={{ zIndex: drawing.current ? 3 : 1 }}
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
       onPointerDown={(e) => {
