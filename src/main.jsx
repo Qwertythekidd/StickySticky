@@ -125,7 +125,7 @@ function Note({ n, onUpdate, onDelete, zoom }) {
     </article>
   );
 }
-function DrawLayer({ strokes, tool, onDraw, zoom, width, height }) {
+function DrawLayer({ strokes, tool, color, onDraw, zoom, width, height }) {
   const ref = useRef(null), drawing = useRef(null);
   const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const point = (e) => {
@@ -160,7 +160,7 @@ function DrawLayer({ strokes, tool, onDraw, zoom, width, height }) {
         <path key={s.id} d={path(s.points)} fill="none" stroke={s.erased ? "#fffdf8" : s.color}
           strokeWidth={s.erased ? 28 : s.width} strokeLinecap="round" strokeLinejoin="round" />
       ))}
-      {drawing.current && <path d={path(drawing.current)} fill="none" stroke={tool === "eraser" ? "#fffdf8" : "#625276"}
+      {drawing.current && <path d={path(drawing.current)} fill="none" stroke={tool === "eraser" ? "#fffdf8" : color}
         strokeWidth={tool === "eraser" ? 28 : 6} strokeLinecap="round" strokeLinejoin="round" />}
     </svg>
   );
@@ -211,6 +211,7 @@ function App() {
     [pan, setPan] = useState({ x: 0, y: 0 }),
     [tool, setTool] = useState("select"),
     [marker, setMarker] = useState(false),
+    [markerColor, setMarkerColor] = useState("#625276"),
     [scene, setScene] = useState("window"),
     [open, setOpen] = useState(false),
     [form, setForm] = useState({ title: "", body: "", color: "yellow" }),
@@ -286,7 +287,7 @@ function App() {
     setOpen(false);
   }
   async function draw(points, mode) {
-    const s = { points, color: "#625276", width: 6, erased: mode === "eraser" };
+    const s = { points, color: markerColor, width: 6, erased: mode === "eraser" };
     try {
       const saved = await api("/strokes", {
         method: "POST",
@@ -381,11 +382,13 @@ function App() {
               }));
             }}
             onPointerUp={() => (panDrag.current = null)}
+            onContextMenu={(e) => { if (tool !== "select") { e.preventDefault(); setTool("select"); setMarker(false); } }}
             onPointerCancel={() => (panDrag.current = null)}
           >
             <DrawLayer
               strokes={strokes}
               tool={tool}
+              color={markerColor}
               onDraw={draw}
               zoom={sceneScale}
               width={board.width}
@@ -443,6 +446,7 @@ function App() {
         >
           ✎ Marker
         </button>
+        <button className={tool === "select" ? "active" : ""} onClick={() => { setTool("select"); setMarker(false); }}>✋ Hand</button>
         {marker && (
           <div className="marker-pop">
             <b>Pick a marker</b>
@@ -451,6 +455,7 @@ function App() {
                 key={c}
                 className={"cap " + c}
                 onClick={() => {
+                  setMarkerColor({ pink: "#d95b78", blue: "#3d9bb6", yellow: "#c28a00", mint: "#3b9d70", lav: "#7650b8" }[c]);
                   setTool("pen");
                   setMarker(false);
                 }}
