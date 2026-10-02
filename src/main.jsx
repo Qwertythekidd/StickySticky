@@ -392,10 +392,12 @@ function App() {
   const maxHeightPct = Math.floor((maxBoardHeight / 1100) * 100);
   const activeNotes = notes.filter((n) => !n.deleted_at && !n.deleted);
   const activeStrokes = strokes.filter((s) => !s.deleted_at && !s.deleted);
-  const minBoardWidth = Math.max(400, ...activeNotes.map((n) => Number(n.x || 0) + 235 + 36), ...activeStrokes.flatMap((s) => (s.points || []).map((p) => Number(p[0]) + Number(s.width || 0) / 2 + 18)));
-  const minBoardHeight = Math.max(400, ...activeNotes.map((n) => Number(n.y || 0) + 174 + 36), ...activeStrokes.flatMap((s) => (s.points || []).map((p) => Number(p[1]) + Number(s.width || 0) / 2 + 18)));
-  const minWidthPct = Math.ceil((minBoardWidth / 1600) * 100);
-  const minHeightPct = Math.ceil((minBoardHeight / 1100) * 100);
+  const rawMinBoardWidth = Math.max(400, ...activeNotes.map((n) => Number(n.x || 0) + 235 + 36), ...activeStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.x ?? p[0]) + Number(s.width || 0) / 2 + 18)));
+  const rawMinBoardHeight = Math.max(400, ...activeNotes.map((n) => Number(n.y || 0) + 174 + 36), ...activeStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.y ?? p[1]) + Number(s.width || 0) / 2 + 18)));
+  const minBoardWidth = Number.isFinite(rawMinBoardWidth) ? rawMinBoardWidth : 400;
+  const minBoardHeight = Number.isFinite(rawMinBoardHeight) ? rawMinBoardHeight : 400;
+  const minWidthPct = Number.isFinite(minBoardWidth) ? Math.ceil((minBoardWidth / 1600) * 100) : 25;
+  const minHeightPct = Number.isFinite(minBoardHeight) ? Math.ceil((minBoardHeight / 1100) * 100) : 25;
   const shrinkHint = shrinkNotice || (widthPct <= minWidthPct || heightPct <= minHeightPct ? "Move content inward to shrink further." : "");
   const maxPanX = Math.max(0, (sceneWidth - viewport.width) / 2);
   const maxPanY = Math.max(0, (sceneHeight - viewport.height) / 2);
