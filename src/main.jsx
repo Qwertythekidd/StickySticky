@@ -395,12 +395,18 @@ function App() {
     if (bucket.length > 1) segments.push({note_id: current, points: bucket});
     return segments;
   }
+  const noteAngle = (n) => ((((String(n.id).charCodeAt(0) || 3) % 7) - 3) * Math.PI) / 180;
+  const toNoteLocal = (p, n) => {
+    const a = -noteAngle(n), cx = 117.5, cy = 87;
+    const x = p.x - n.x - cx, y = p.y - n.y - cy;
+    return { x: x * Math.cos(a) - y * Math.sin(a) + cx, y: x * Math.sin(a) + y * Math.cos(a) + cy };
+  };
   async function draw(points, mode, ns) {
     if (mode === "eraser") {
       const radius = eraserRef.current / 2;
       const surface = ownership(points.slice(0, 1), ns)[0]?.note_id || null;
       const surfaceNote = surface && ns.find(n => n.id === surface);
-      const localEraser = surfaceNote ? points.map(p => ({x:p.x-surfaceNote.x,y:p.y-surfaceNote.y})) : points;
+      const localEraser = surfaceNote ? points.map(p => toNoteLocal(p, surfaceNote)) : points;
       const fragments=[]; const hit=[];
       for (const s of strokesRef.current.filter(s=>!s.deleted && (s.note_id || null) === surface)) {
         const clipped=clipPolyline(s.points,localEraser,radius,s.width);
@@ -416,7 +422,7 @@ function App() {
     }
     const pieces = ownership(points, ns).map(piece => {
       const note = piece.note_id && ns.find(n => n.id === piece.note_id);
-      return note ? {...piece, points: piece.points.map(p => ({x:p.x-note.x,y:p.y-note.y}))} : piece;
+      return note ? {...piece, points: piece.points.map(p => toNoteLocal(p, note))} : piece;
     });
     try {
       const saved = await Promise.all(pieces.map(piece => api("/strokes", { method: "POST", body: JSON.stringify({...piece, color: colorRef.current, width: markerRef.current}) })));
