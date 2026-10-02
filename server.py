@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 ROOT = Path(__file__).parent
+STATIC_ROOT = ROOT / "dist" if (ROOT / "dist" / "index.html").is_file() else ROOT
 DATA = Path(os.environ.get("STICKY_STICKY_DATA_DIR", Path(os.environ.get("XDG_DATA_HOME", Path.home()/".local/share")) / "sticky-sticky"))
 DATA.mkdir(parents=True, exist_ok=True)
 DB = DATA / "notes.db"
@@ -31,7 +32,7 @@ def db(path=DB):
 def utc_now(): return datetime.now(timezone.utc).isoformat()
 
 class Handler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, db_path=DB, **kwargs): self.db_path = db_path; super().__init__(*args, directory=str(ROOT), **kwargs)
+    def __init__(self, *args, db_path=DB, **kwargs): self.db_path = db_path; super().__init__(*args, directory=str(STATIC_ROOT), **kwargs)
     def send_json(self, status, value):
         raw = json.dumps(value, separators=(",", ":")).encode(); self.send_response(status); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(raw))); self.end_headers(); self.wfile.write(raw)
     def read_body(self):
