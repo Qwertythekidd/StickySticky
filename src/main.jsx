@@ -229,7 +229,8 @@ function App() {
     [scene, setScene] = useState("window"),
     [open, setOpen] = useState(false),
     [form, setForm] = useState({ title: "", body: "", color: "yellow" }),
-    [conflict, setConflict] = useState(false);
+    [conflict, setConflict] = useState(false),
+    [shrinkNotice, setShrinkNotice] = useState("");
   const panDrag = useRef(null);
   const paletteDrag = useRef(null);
   useEffect(() => {
@@ -282,7 +283,17 @@ function App() {
       });
       setBoard(b);
       boardVersion.current = b.version;
-      } catch { setConflict(true); }
+      } catch (error) {
+        if (/board_(width|height)_clips_content/.test(error.message)) {
+          const latest = await api("/board").catch(() => null);
+          if (latest) {
+            setBoard(latest);
+            setWidthPct(Math.round((latest.width / 1600) * 100));
+            setHeightPct(Math.round((latest.height / 1100) * 100));
+          }
+          setShrinkNotice("Move content inward to shrink further.");
+        } else setConflict(true);
+      }
     });
     return boardSave.current;
   }
@@ -375,6 +386,13 @@ function App() {
   const maxBoardHeight = Math.max(400, sceneConfig.scene_height - sceneConfig.board_y - 1100);
   const maxWidthPct = Math.floor((maxBoardWidth / 1600) * 100);
   const maxHeightPct = Math.floor((maxBoardHeight / 1100) * 100);
+  const activeNotes = notes.filter((n) => !n.deleted_at && !n.deleted);
+  const activeStrokes = strokes.filter((s) => !s.deleted_at && !s.deleted);
+  const minBoardWidth = Math.max(400, ...activeNotes.map((n) => Number(n.x || 0) + 235 + 36), ...activeStrokes.flatMap((s) => (s.points || []).map((p) => Number(p[0]) + Number(s.width || 0) / 2 + 18)));
+  const minBoardHeight = Math.max(400, ...activeNotes.map((n) => Number(n.y || 0) + 174 + 36), ...activeStrokes.flatMap((s) => (s.points || []).map((p) => Number(p[1]) + Number(s.width || 0) / 2 + 18)));
+  const minWidthPct = Math.ceil((minBoardWidth / 1600) * 100);
+  const minHeightPct = Math.ceil((minBoardHeight / 1100) * 100);
+  const shrinkHint = shrinkNotice || (widthPct <= minWidthPct || heightPct <= minHeightPct ? "Move content inward to shrink further." : "");
   const maxPanX = Math.max(0, (sceneWidth - viewport.width) / 2);
   const maxPanY = Math.max(0, (sceneHeight - viewport.height) / 2);
   const clampPan = (p) => ({
@@ -405,15 +423,18 @@ function App() {
   };
   useEffect(() => setPan((p) => clampPan(p)), [zoom, viewport, board.width, board.height]);
   useEffect(() => {
-    if (widthPct > maxWidthPct) setWidthPct(maxWidthPct);
-    if (heightPct > maxHeightPct) setHeightPct(maxHeightPct);
-    const next = Math.min(maxBoardWidth, Math.round(1600 * widthPct / 100));
-    const nextHeight = Math.min(maxBoardHeight, Math.round(1100 * heightPct / 100));
+    const safeWidthPct = Math.min(maxWidthPct, Math.max(minWidthPct, widthPct));
+    const safeHeightPct = Math.min(maxHeightPct, Math.max(minHeightPct, heightPct));
+    if (safeWidthPct !== widthPct) setWidthPct(safeWidthPct);
+    if (safeHeightPct !== heightPct) setHeightPct(safeHeightPct);
+    const next = Math.min(maxBoardWidth, Math.max(minBoardWidth, Math.round(1600 * safeWidthPct / 100)));
+    const nextHeight = Math.min(maxBoardHeight, Math.max(minBoardHeight, Math.round(1100 * safeHeightPct / 100)));
     if (board.width !== next || board.height !== nextHeight) {
       setBoard((b) => ({ ...b, width: next, height: nextHeight }));
+      setShrinkNotice("");
       saveBoard({ width: next, height: nextHeight });
     }
-  }, [widthPct, heightPct, maxBoardWidth, maxBoardHeight]);
+  }, [widthPct, heightPct, maxBoardWidth, maxBoardHeight, minBoardWidth, minBoardHeight]);
   async function updateScene(patch) {
     const next = { ...sceneConfig, ...patch };
     try { setSceneConfig(await api("/scene", { method: "PUT", body: JSON.stringify({ ...next, version: sceneConfig.version }) })); }
@@ -553,7 +574,7 @@ function App() {
       </div>
       <div className="controls">
         <span>Width</span>
-        <button onClick={() => setWidthPct(Math.max(25, widthPct - 10))}>
+        <button onClick={() => setWidthPct(Math.max(minWidthPct, widthPct - 10))} disabled={widthPct <= minWidthPct} title={widthPct <= minWidthPct ? "Move content inward to shrink further" : "Shrink board width"}>
           −
         </button>
         <b>{widthPct}%</b>
@@ -561,7 +582,7 @@ function App() {
           ＋
         </button>
         <span>Height</span>
-        <button onClick={() => setHeightPct(Math.max(25, heightPct - 10))}>−</button>
+        <button onClick={() => setHeightPct(Math.max(minHeightPct, heightPct - 10))} disabled={heightPct <= minHeightPct} title={heightPct <= minHeightPct ? "Move content inward to shrink further" : "Shrink board height"}>−</button>
         <b>{heightPct}%</b>
         <button onClick={() => setHeightPct(Math.min(maxHeightPct, heightPct + 10))} disabled={heightPct >= maxHeightPct}>＋</button>
         <i />
@@ -570,6 +591,7 @@ function App() {
         <b>{Math.round(zoom * 100)}%</b>
         <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))}>＋</button>
       </div>
+      {shrinkHint && <div className="board-size-notice" role="status">{shrinkHint}</div>}
     </div>
   );
 }
