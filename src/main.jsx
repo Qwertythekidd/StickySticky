@@ -165,11 +165,27 @@ function DrawLayer({ strokes, tool, onDraw, zoom, width, height }) {
     </svg>
   );
 }
-function SceneLayer({ preset, pan, zoom, children }) {
-  return <>{children}<div className={`scene-background scene-${preset}`} style={{ transform: `translate(${pan.x * 0.35}px,${pan.y * 0.35}px) scale(${Math.max(0.72, 0.82 + zoom * 0.18)})` }} aria-hidden="true"><div className="scene-window-frame" /><div className="scene-sun" /></div></>;
+function SceneLayer({ preset, scene, pan, scale, children }) {
+  const { scene_width: width, scene_height: height, board_x: boardX, board_y: boardY } = scene;
+  const sceneStyle = {
+    width: width * scale,
+    height: height * scale,
+    transform: `translate(calc(-50% + ${pan.x}px),calc(-50% + ${pan.y}px))`,
+  };
+  const boardStyle = {
+    left: boardX * scale,
+    top: boardY * scale,
+    width: (children.props.board.width + 36) * scale,
+    height: (children.props.board.height + 36) * scale,
+  };
+  return <div className="scene-world" style={sceneStyle} aria-hidden="true">
+    <div className={`scene-background scene-${preset}`}><div className="scene-window-frame" /><div className="scene-sun" /></div>
+    <div className="scene-board-shadow" style={boardStyle} />
+    {children}
+  </div>;
 }
-function CameraLayer({ children, board, pan, sceneScale }) {
-  return <section className="board-shell" style={{ width: board.width, height: board.height, transform: `translate(calc(-50% + ${pan.x}px),calc(-50% + ${pan.y}px)) scale(${sceneScale})` }}>{children}</section>;
+function CameraLayer({ children, board, scene, pan, sceneScale }) {
+  return <section className="board-shell" style={{ left: scene.board_x * sceneScale, top: scene.board_y * sceneScale, width: board.width, height: board.height, transform: `translate(${pan.x}px,${pan.y}px) scale(${sceneScale})` }}>{children}</section>;
 }
 function App() {
   useEffect(() => {
@@ -287,15 +303,23 @@ function App() {
     (viewport.height - gutter * 2) / (1100 + 36),
   );
   const sceneScale = Math.min(1, fit) * zoom;
-  const sceneWidth = (board.width + 36) * sceneScale;
-  const sceneHeight = (board.height + 36) * sceneScale;
+  const sceneWidth = sceneConfig.scene_width * sceneScale;
+  const sceneHeight = sceneConfig.scene_height * sceneScale;
   const maxBoardWidth = Math.max(400, sceneConfig.scene_width - sceneConfig.board_x - 1600);
   const maxBoardHeight = Math.max(400, sceneConfig.scene_height - sceneConfig.board_y - 1100);
   const maxWidthPct = Math.floor((maxBoardWidth / 1600) * 100);
   const maxHeightPct = Math.floor((maxBoardHeight / 1100) * 100);
-  const maxPanX = Math.max(0, (sceneWidth - (viewport.width - gutter * 2)) / 2);
-  const maxPanY = Math.max(0, (sceneHeight - (viewport.height - gutter * 2)) / 2);
-  const clampPan = (p) => p;
+  const maxPanX = Math.max(0, (sceneWidth - viewport.width) / 2);
+  const maxPanY = Math.max(0, (sceneHeight - viewport.height) / 2);
+  const clampPan = (p) => ({
+    x: Math.max(-maxPanX, Math.min(maxPanX, p.x)),
+    y: Math.max(-maxPanY, Math.min(maxPanY, p.y)),
+  });
+  const anchorPan = {
+    x: sceneWidth / 2 - (sceneConfig.board_x + board.width / 2) * sceneScale,
+    y: sceneHeight / 2 - (sceneConfig.board_y + board.height / 2) * sceneScale,
+  };
+  const cameraPan = { x: pan.x + anchorPan.x, y: pan.y + anchorPan.y };
   const onWheel = (e) => {
     if (e.target.closest("input,textarea,select,button,.dialog,.marker-pop")) return;
     e.preventDefault();
@@ -304,9 +328,9 @@ function App() {
     if (nextZoom === zoom) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pointer = { x: e.clientX - rect.left - viewport.width / 2, y: e.clientY - rect.top - viewport.height / 2 };
-    const world = { x: (pointer.x - pan.x) / sceneScale, y: (pointer.y - pan.y) / sceneScale };
+    const world = { x: (pointer.x - cameraPan.x) / sceneScale, y: (pointer.y - cameraPan.y) / sceneScale };
     setZoom(nextZoom);
-    setPan(clampPan({ x: pointer.x - world.x * (sceneScale * nextZoom / zoom), y: pointer.y - world.y * (sceneScale * nextZoom / zoom) }));
+    setPan(clampPan({ x: pointer.x - world.x * (sceneScale * nextZoom / zoom) - anchorPan.x, y: pointer.y - world.y * (sceneScale * nextZoom / zoom) - anchorPan.y }));
   };
   useEffect(() => setPan((p) => clampPan(p)), [zoom, viewport, board.width, board.height]);
   useEffect(() => {
@@ -327,8 +351,8 @@ function App() {
   return (
     <div className="app">
       <main className="stage" onWheel={onWheel}>
-        <SceneLayer preset={scene} pan={pan} zoom={zoom} />
-        <CameraLayer board={board} pan={pan} sceneScale={sceneScale}>
+        <SceneLayer preset={scene} scene={sceneConfig} pan={cameraPan} scale={sceneScale}>
+        <CameraLayer board={board} scene={sceneConfig} pan={{x: 0, y: 0}} sceneScale={sceneScale}>
           <Board
             width={board.width}
             height={board.height}
@@ -373,6 +397,7 @@ function App() {
             ))}
           </Board>
         </CameraLayer>
+        </SceneLayer>
       </main>
       {conflict && (
         <div className="conflict">
