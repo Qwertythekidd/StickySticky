@@ -31,6 +31,31 @@ def db(path=DB):
 
 def utc_now(): return datetime.now(timezone.utc).isoformat()
 
+def _seg_dist(a, b, p):
+    dx, dy = b[0]-a[0], b[1]-a[1]
+    if dx == dy == 0: return math.hypot(p[0]-a[0], p[1]-a[1]), 0
+    t = max(0, min(1, ((p[0]-a[0])*dx + (p[1]-a[1])*dy)/(dx*dx+dy*dy)))
+    q = (a[0]+t*dx, a[1]+t*dy)
+    return math.hypot(p[0]-q[0], p[1]-q[1]), t
+
+def erase_polyline(points, eraser, radius):
+    """Return untouched polyline fragments after swept capsule erasing."""
+    if len(points) < 2: return []
+    out, cur = [], []
+    def flush():
+        nonlocal cur
+        if len(cur) > 1: out.append(cur)
+        cur = []
+    for a, b in zip(points, points[1:]):
+        da, ta = _seg_dist(a, b, eraser[0]); db, tb = _seg_dist(a, b, eraser[1])
+        hit = min(da, db) <= radius or _seg_dist(eraser[0], eraser[1], a)[0] <= radius or _seg_dist(eraser[0], eraser[1], b)[0] <= radius
+        if hit:
+            flush()
+        else:
+            if not cur: cur = [a]
+            cur.append(b)
+    flush(); return out
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, db_path=DB, **kwargs): self.db_path = db_path; super().__init__(*args, directory=str(STATIC_ROOT), **kwargs)
     def send_json(self, status, value):
@@ -61,6 +86,20 @@ class Handler(SimpleHTTPRequestHandler):
             n = {"id":str(uuid.uuid4()),"title":"","body":"","color":"yellow","stamp":"✦","x":100,"y":100,"done":0,"version":1}
             n.update({k:payload[k] for k in n if k in payload and k not in {"id","version"}})
             c.execute("INSERT INTO notes(id,title,body,color,stamp,x,y,done,version) VALUES(?,?,?,?,?,?,?,?,?)", tuple(n.values())); c.commit(); out = dict(c.execute("SELECT * FROM notes WHERE id=?",(n["id"],)).fetchone()); self.send_json(201,out)
+        elif p == ["api","strokes","batch"]:
+            originals = payload.get("originals", []); fragments = payload.get("fragments", [])
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                for item in originals:
+                    row = c.execute("SELECT version FROM strokes WHERE id=? AND deleted_at IS NULL", (item["id"],)).fetchone()
+                    if row is None or int(item.get("version", row[0])) != row[0]: raise ValueError("conflict")
+                now = utc_now()
+                for item in originals: c.execute("UPDATE strokes SET deleted_at=?,version=version+1 WHERE id=?", (now,item["id"]))
+                made=[]
+                for item in fragments:
+                    sid=item.get("id",str(uuid.uuid4())); c.execute("INSERT INTO strokes(id,points,color,width) VALUES(?,?,?,?)",(sid,json.dumps(item["points"]),item["color"],float(item["width"]))); made.append(sid)
+                c.commit(); self.send_json(201,{"fragments":[dict(c.execute("SELECT * FROM strokes WHERE id=?",(sid,)).fetchone()) for sid in made]})
+            except ValueError: c.rollback(); self.send_json(409,{"error":"conflict"})
         elif p == ["api","strokes"]:
             if not isinstance(payload.get("points"), list): self.send_json(400,{"error":"points_required"})
             else:
