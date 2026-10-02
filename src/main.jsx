@@ -208,7 +208,7 @@ function SceneLayer({ preset, scene, pan, scale, children }) {
     height: (children.props.board.height + 36) * scale,
   };
   return <div className="scene-world" style={sceneStyle} aria-hidden="true">
-    <div className={`scene-background scene-${preset}`}><div className="scene-window-frame" /><div className="scene-sun" /></div>
+    <div className={`scene-background scene-${preset}`}><div className="scene-sun" /></div>
     <div className="scene-board-shadow" style={boardStyle} />
     {children}
   </div>;
