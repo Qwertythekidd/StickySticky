@@ -237,6 +237,9 @@ function App() {
     [shrinkNotice, setShrinkNotice] = useState("");
   const panDrag = useRef(null);
   const paletteDrag = useRef(null);
+  const cameraReady = useRef(false);
+  const cameraKey = "sticky-sticky.camera.v1";
+  const readCamera = () => { try { const v=JSON.parse(localStorage.getItem(cameraKey)||"null"); if (!v || !Number.isFinite(v.zoom) || v.zoom < .45 || v.zoom > 1.5 || !Number.isFinite(v.pan?.x) || !Number.isFinite(v.pan?.y)) return null; return {zoom:v.zoom,pan:{x:v.pan.x,y:v.pan.y}}; } catch { return null; } };
   useEffect(() => {
     const move = (e) => { if (paletteDrag.current) paletteDrag.current.last = { x:e.clientX, y:e.clientY }; };
     const up = async (e) => {
@@ -269,11 +272,14 @@ function App() {
         if (sc) setSceneConfig(sc);
         setNotes(ns);
         setStrokes(Array.isArray(ss) ? ss : ss.strokes || []);
+        const savedCamera=readCamera(); if(savedCamera){ setZoom(savedCamera.zoom); setPan(savedCamera.pan); }
+        cameraReady.current=true;
       } catch {
         setConflict(true);
       }
     })();
   }, []);
+  useEffect(() => { if (!cameraReady.current) return; const t=setTimeout(()=>{ try { localStorage.setItem(cameraKey,JSON.stringify({zoom,pan})); } catch {} },150); return ()=>clearTimeout(t); }, [zoom,pan]);
   const boardSave = useRef(Promise.resolve());
   const boardVersion = useRef(board.version);
   useEffect(() => { boardVersion.current = board.version; }, [board.version]);
