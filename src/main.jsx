@@ -48,6 +48,10 @@ const api = async (path, opts = {}) => {
   return r.json();
 };
 const colors = ["pink", "blue", "yellow", "mint", "lav"];
+const scenePresets = {
+  window: "scene-window",
+  sunset: "scene-sunset",
+};
 function Note({ n, onUpdate, onDelete, zoom }) {
   const drag = useRef(null);
   return (
@@ -182,6 +186,7 @@ function App() {
     [pan, setPan] = useState({ x: 0, y: 0 }),
     [tool, setTool] = useState("select"),
     [marker, setMarker] = useState(false),
+    [scene, setScene] = useState("window"),
     [open, setOpen] = useState(false),
     [form, setForm] = useState({ title: "", body: "", color: "yellow" }),
     [conflict, setConflict] = useState(false);
@@ -299,6 +304,10 @@ function App() {
   return (
     <div className="app">
       <main className="stage" onWheel={onWheel}>
+        <div className={`scene-background ${scenePresets[scene]}`} style={{ transform: `translate(${pan.x * 0.35}px,${pan.y * 0.35}px) scale(${Math.max(0.72, 0.82 + zoom * 0.18)})` }} aria-hidden="true">
+          <div className="scene-window-frame" />
+          <div className="scene-sun" />
+        </div>
         <section
           className="board-shell"
           style={{
@@ -385,6 +394,9 @@ function App() {
           }}
         >
           ↶ Undo
+        </button>
+        <button onClick={() => setScene((x) => (x === "window" ? "sunset" : "window"))}>
+          Scene: {scene}
         </button>
         <button
           className={tool === "pen" ? "active" : ""}
