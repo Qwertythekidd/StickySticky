@@ -238,7 +238,7 @@ function App() {
     };
     addEventListener("pointermove",move); addEventListener("pointerup",up);
     return () => { removeEventListener("pointermove",move); removeEventListener("pointerup",up); };
-  }, [sceneScale]);
+  }, []);
   useEffect(() => {
     const onResize = () => setViewport({ width: innerWidth, height: innerHeight });
     addEventListener("resize", onResize);
