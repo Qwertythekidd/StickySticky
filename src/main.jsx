@@ -528,6 +528,7 @@ function App() {
         </div>
       )}
       <div className="toolbar">
+        <button className="trash-drop" data-trash type="button" aria-label="Trash notes" onClick={() => document.querySelector(".note:focus")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }))}>🗑</button>
         <button className="new" onClick={() => { setOpen(x=>!x); setTool("select"); }}>
           ＋ New note
         </button>
@@ -619,7 +620,6 @@ function App() {
         <b>{Math.round(zoom * 100)}%</b>
         <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))}>＋</button>
       </div>
-      <button className="trash-drop" data-trash type="button" aria-label="Trash notes" onClick={() => document.querySelector(".note:focus")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }))}>🗑</button>
       {shrinkHint && <div className="board-size-notice" role="status">{shrinkHint}</div>}
     </div>
   );
