@@ -164,6 +164,12 @@ function DrawLayer({ strokes, tool, onDraw, zoom, width, height }) {
     </svg>
   );
 }
+function SceneLayer({ preset, pan, zoom, children }) {
+  return <>{children}<div className={`scene-background scene-${preset}`} style={{ transform: `translate(${pan.x * 0.35}px,${pan.y * 0.35}px) scale(${Math.max(0.72, 0.82 + zoom * 0.18)})` }} aria-hidden="true"><div className="scene-window-frame" /><div className="scene-sun" /></div></>;
+}
+function CameraLayer({ children, board, pan, sceneScale }) {
+  return <section className="board-shell" style={{ width: board.width, height: board.height, transform: `translate(calc(-50% + ${pan.x}px),calc(-50% + ${pan.y}px)) scale(${sceneScale})` }}>{children}</section>;
+}
 function App() {
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && setMarker(false);
@@ -314,20 +320,10 @@ function App() {
   return (
     <div className="app">
       <main className="stage" onWheel={onWheel}>
-        <div className={`scene-background ${scenePresets[scene]}`} style={{ transform: `translate(${pan.x * 0.35}px,${pan.y * 0.35}px) scale(${Math.max(0.72, 0.82 + zoom * 0.18)})` }} aria-hidden="true">
-          <div className="scene-window-frame" />
-          <div className="scene-sun" />
-        </div>
-        <section
-          className="board-shell"
-          style={{
-            width: board.width,
-            height: board.height,
-            transform: `translate(calc(-50% + ${pan.x}px),calc(-50% + ${pan.y}px)) scale(${sceneScale})`,
-          }}
-        >
+        <SceneLayer preset={scene} pan={pan} zoom={zoom} />
+        <CameraLayer board={board} pan={pan} sceneScale={sceneScale}>
           <div
-            className="board"
+            className={`board frame-${sceneConfig.frame_style}`}
             style={{
               width: board.width,
               height: board.height,
@@ -377,7 +373,7 @@ function App() {
               />
             ))}
           </div>
-        </section>
+        </CameraLayer>
       </main>
       {conflict && (
         <div className="conflict">
@@ -412,7 +408,7 @@ function App() {
         <button onClick={() => updateScene({ scene_width: sceneConfig.scene_width + 10000 })}>Scene W＋</button>
         <button onClick={() => updateScene({ scene_height: Math.max(board.height + 20000, sceneConfig.scene_height - 10000) })}>Scene H−</button>
         <button onClick={() => updateScene({ scene_height: sceneConfig.scene_height + 10000 })}>Scene H＋</button>
-        <button onClick={() => updateScene({ frame_style: sceneConfig.frame_style === "paper" ? "wood" : "paper" })}>Frame: {sceneConfig.frame_style}</button>
+        <button onClick={() => updateScene({ frame_style: sceneConfig.frame_style === "paper" ? "silver" : sceneConfig.frame_style === "silver" ? "wood" : "paper" })}>Frame: {sceneConfig.frame_style}</button>
         <button
           className={tool === "pen" ? "active" : ""}
           onClick={() => {
