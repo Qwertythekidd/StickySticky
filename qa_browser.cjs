@@ -46,7 +46,7 @@ const fail = (m) => { throw new Error(m); };
   await page.mouse.down(); await page.mouse.move(boardBox.x + 540, boardBox.y + 245); await page.mouse.up();
   await page.waitForTimeout(150);
   const erased = await (await page.request.get(`http://127.0.0.1:${port}/api/strokes`)).json();
-  if (erased.length !== drawn.length + 1) fail('eraser stroke was not persisted');
+  if (erased.length >= drawn.length) fail('eraser did not remove the intersected stroke without overpaint');
   await page.getByRole('button', { name: '↶ Undo' }).click(); await page.waitForTimeout(150);
   await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(150);
   const afterUndoReload = await (await page.request.get(`http://127.0.0.1:${port}/api/strokes`)).json();

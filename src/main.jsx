@@ -126,7 +126,7 @@ function Note({ n, onUpdate, onDelete, zoom }) {
   );
 }
 function DrawLayer({ strokes, tool, color, eraserSize, onDraw, zoom, width, height }) {
-  const ref = useRef(null), drawing = useRef(null);
+  const ref = useRef(null), drawing = useRef(null), cursor = useRef(null);
   const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const point = (e) => {
     const r = ref.current.getBoundingClientRect();
@@ -144,6 +144,8 @@ function DrawLayer({ strokes, tool, color, eraserSize, onDraw, zoom, width, heig
         drawing.current = [point(e)];
       }}
       onPointerMove={(e) => {
+        const r = ref.current.getBoundingClientRect();
+        if (cursor.current) { cursor.current.setAttribute("cx", (e.clientX - r.left) / zoom); cursor.current.setAttribute("cy", (e.clientY - r.top) / zoom); }
         if (!drawing.current) return;
         const p = point(e),
           last = drawing.current.at(-1);
@@ -155,13 +157,18 @@ function DrawLayer({ strokes, tool, color, eraserSize, onDraw, zoom, width, heig
           drawing.current = null;
         }
       }}
+      onPointerLeave={() => { if (cursor.current) cursor.current.setAttribute("visibility", "hidden"); }}
+      onPointerEnter={() => { if (cursor.current) cursor.current.setAttribute("visibility", "visible"); }}
     >
       {strokes.filter((s) => !s.deleted).map((s) => (
-        <path key={s.id} d={path(s.points)} fill="none" stroke={s.erased ? "#fffdf8" : s.color}
-          strokeWidth={s.erased ? 28 : s.width} strokeLinecap="round" strokeLinejoin="round" />
+        <path key={s.id} d={path(s.points)} fill="none" stroke={s.color}
+          strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" />
       ))}
-      {drawing.current && <path d={path(drawing.current)} fill="none" stroke={tool === "eraser" ? "#fffdf8" : color}
-        strokeWidth={tool === "eraser" ? eraserSize : 6} strokeLinecap="round" strokeLinejoin="round" />}
+      {drawing.current && tool !== "eraser" && <path d={path(drawing.current)} fill="none" stroke={color}
+        strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />}
+      <circle ref={cursor} cx="0" cy="0" r={tool === "eraser" ? eraserSize / 2 : 4} fill="none"
+        stroke={tool === "eraser" ? "#453c54" : color} strokeDasharray={tool === "eraser" ? "4 3" : "none"}
+        strokeWidth={tool === "eraser" ? 1.5 / zoom : 2 / zoom} pointerEvents="none" visibility={tool === "select" ? "hidden" : "visible"} />
     </svg>
   );
 }
@@ -287,22 +294,40 @@ function App() {
     setForm({ title: "", body: "", color: "yellow" });
     setOpen(false);
   }
+  const strokesRef = useRef(strokes), colorRef = useRef(markerColor), eraserRef = useRef(eraserSize), history = useRef([]);
+  useEffect(() => { strokesRef.current = strokes; }, [strokes]);
+  useEffect(() => { colorRef.current = markerColor; }, [markerColor]);
+  useEffect(() => { eraserRef.current = eraserSize; }, [eraserSize]);
+  const segmentDistance = (a, b, c, d) => {
+    const abx=b.x-a.x, aby=b.y-a.y, cdx=d.x-c.x, cdy=d.y-c.y;
+    const cross=(abx*cdy-aby*cdx);
+    if (Math.abs(cross)>1e-9) { const t=((c.x-a.x)*cdy-(c.y-a.y)*cdx)/cross, u=((c.x-a.x)*aby-(c.y-a.y)*abx)/cross; if(t>=0&&t<=1&&u>=0&&u<=1)return 0; }
+    const dist=(p,x,y)=>{const dx=y.x-x.x,dy=y.y-x.y,t=Math.max(0,Math.min(1,((p.x-x.x)*dx+(p.y-x.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-(x.x+t*dx),p.y-(x.y+t*dy));};
+    return Math.min(dist(a,c,d),dist(b,c,d),dist(c,a,b),dist(d,a,b));
+  };
   async function draw(points, mode) {
     if (mode === "eraser") {
-      const hit = strokes.find((s) => s.points?.some((p) => points.some((q) => Math.hypot(p.x - q.x, p.y - q.y) <= eraserSize / 2)));
-      if (!hit?.id) return;
-      try { await api("/strokes/" + hit.id, { method: "DELETE" }); setStrokes((xs) => xs.map((s) => s.id === hit.id ? { ...s, deleted: true } : s)); } catch { setConflict(true); }
+      const radius = eraserRef.current / 2;
+      const hit = strokesRef.current.filter(s => !s.deleted && s.points?.some((p,i)=> {
+        if (i===0) return points.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<=radius);
+        return points.some((q,j)=>segmentDistance(s.points[i-1],p,points[Math.max(0,j-1)],q)<=radius);
+      }));
+      if (!hit.length) return;
+      try { for (const s of hit) await api("/strokes/" + s.id, { method: "DELETE" });
+        setStrokes(xs => xs.map(s => hit.some(h=>h.id===s.id) ? {...s,deleted:true,version:(s.version||1)+1} : s));
+        history.current.push({type:"erase", strokes:hit});
+      } catch { setConflict(true); }
       return;
     }
-    const s = { points, color: markerColor, width: 6, erased: mode === "eraser" };
+    const s = { points, color: colorRef.current, width: 6 };
     try {
       const saved = await api("/strokes", {
         method: "POST",
         body: JSON.stringify(s),
       });
-      setStrokes((x) => [...x, saved]);
+      setStrokes((x) => [...x, saved]); history.current.push({type:"draw", strokes:[saved]});
     } catch {
-      setStrokes((x) => [...x, { ...s, id: crypto.randomUUID() }]);
+      const local={ ...s, id: crypto.randomUUID() }; setStrokes((x) => [...x, local]); history.current.push({type:"draw", strokes:[local]});
     }
   }
   const gutter = Math.min(192, Math.max(24, viewport.width * 0.15));
@@ -363,7 +388,7 @@ function App() {
   }
   return (
     <div className="app">
-      <main className="stage" onWheel={onWheel}>
+      <main className="stage" style={{ cursor: tool === "pen" ? "crosshair" : tool === "eraser" ? "none" : undefined }} onWheel={onWheel}>
         <SceneLayer preset={scene} scene={sceneConfig} pan={anchorPan} scale={sceneScale}>
         <CameraLayer board={board} scene={sceneConfig} pan={pan} sceneScale={sceneScale}>
           <Board
@@ -428,15 +453,11 @@ function App() {
         </button>
         <button
           onClick={async () => {
-            const last = strokes.at(-1);
-            if (last?.id) {
-              try {
-                await api("/strokes/" + last.id, { method: "DELETE" });
-                setStrokes((x) => x.slice(0, -1));
-              } catch {
-                setConflict(true);
-              }
-            }
+            const action = history.current.pop(); if (!action) return;
+            try {
+              if (action.type === "draw") { for (const s of action.strokes) await api("/strokes/" + s.id, { method: "DELETE" }); setStrokes(x => x.filter(s => !action.strokes.some(a=>a.id===s.id))); }
+              else { const restored=[]; for (const s of action.strokes) restored.push(await api("/strokes/" + s.id, { method:"PATCH", body:JSON.stringify({restore:true,version:s.version+1}) })); setStrokes(x => x.map(s => restored.find(r=>r.id===s.id) || s)); }
+            } catch { setConflict(true); }
           }}
         >
           ↶ Undo
@@ -471,6 +492,7 @@ function App() {
                 {c}
               </button>
             ))}
+            <label className="custom-color">Custom <input aria-label="Custom marker color" type="color" value={markerColor} onChange={(e) => { setMarkerColor(e.target.value); setTool("pen"); }} /></label>
             <button
               className="eraser"
               onClick={() => {
