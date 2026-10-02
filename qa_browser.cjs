@@ -55,7 +55,10 @@ const fail = (m) => { throw new Error(m); };
   await title.fill('QA title'); await title.blur();
   await subtitle.fill('QA subtitle'); await subtitle.blur();
   await page.waitForTimeout(150); await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(150);
-  if (await title.inputValue() !== 'QA title' || await subtitle.inputValue() !== 'QA subtitle') fail('title/subtitle did not survive reload');
+  if (await title.inputValue() !== 'QA title' || await subtitle.inputValue() !== 'QA subtitle') {
+    const persistedBoard = await (await page.request.get(`http://127.0.0.1:${port}/api/board`)).json();
+    fail('title/subtitle did not survive reload: ' + JSON.stringify(persistedBoard));
+  }
   const noteBefore = await page.locator('.note').boundingBox();
   await page.locator('.note').dispatchEvent('pointerdown', { pointerId: 1, clientX: noteBefore.x + 20, clientY: noteBefore.y + 20, bubbles: true });
   await page.locator('.note').dispatchEvent('pointermove', { pointerId: 1, clientX: noteBefore.x + 80, clientY: noteBefore.y + 60, bubbles: true });

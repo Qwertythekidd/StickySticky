@@ -274,9 +274,10 @@ function App() {
   function saveBoard(p) {
     boardSave.current = boardSave.current.then(async () => {
       try {
+      const latest = await api("/board");
       const b = await api("/board", {
         method: "PUT",
-        body: JSON.stringify({ ...p, version: boardVersion.current }),
+        body: JSON.stringify({ ...p, version: latest.version }),
       });
       setBoard(b);
       boardVersion.current = b.version;
