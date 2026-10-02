@@ -145,7 +145,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json(409,{"error":"conflict","current_version":row["version"]}); c.close(); return
         allowed = {"preset","frame_style","scene_width","scene_height","board_x","board_y"}
         vals = {k:payload[k] for k in allowed if k in payload}
-        if vals.get("preset") not in (None,"window","sunset") or vals.get("frame_style") not in (None,"paper","wood","mint"):
+        if vals.get("preset") not in (None,"window","sunset") or vals.get("frame_style") not in (None,"paper","silver","wood","mint"):
             self.send_json(400,{"error":"invalid_scene_style"}); c.close(); return
         for key in ("scene_width","scene_height"):
             if key in vals and (not isinstance(vals[key],(int,float)) or not math.isfinite(vals[key]) or vals[key] < 1600 or vals[key] > 10000000):
