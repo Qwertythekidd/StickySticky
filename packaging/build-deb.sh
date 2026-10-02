@@ -12,7 +12,7 @@ Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: all
-Depends: python3, curl, chromium | chromium-browser
+Depends: python3, curl, brave-browser | chromium | chromium-browser
 Maintainer: QWERTY the Kid <qwertythekid@gmail.com>
 Description: Sticky-Sticky local draggable notes board
  A simple, draggable notes board for tracking tasks and priorities.
