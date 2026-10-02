@@ -23,7 +23,7 @@ def db(path=DB):
     c.execute("INSERT OR IGNORE INTO board_settings(id) VALUES(1)")
     c.execute("INSERT OR IGNORE INTO scene_settings(id) VALUES(1)")
     b = c.execute("SELECT width,height FROM board_settings WHERE id=1").fetchone()
-    c.execute("UPDATE scene_settings SET scene_width=MAX(scene_width,?),scene_height=MAX(scene_height,?),board_x=MAX(board_x,?),board_y=MAX(board_y,?) WHERE id=1 AND version=1", (b[0] + 20000, b[1] + 20000, b[0] / 2, b[1] / 2))
+    c.execute("UPDATE scene_settings SET scene_width=MAX(scene_width,?),scene_height=MAX(scene_height,?) WHERE id=1 AND version=1", (b[0] + 20000, b[1] + 20000))
     c.commit(); return c
 
 def utc_now(): return datetime.now(timezone.utc).isoformat()
