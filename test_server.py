@@ -33,4 +33,10 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(self.request('PUT','/api/scene',{'scene_width':float('inf'),'version':fresh['version']})[0],400)
         self.assertEqual(self.request('PUT','/api/scene',{'scene_width':1000,'version':fresh['version']})[0],400)
 
+    def test_stroke_batch_atomic_conflict(self):
+        status, s = self.request('POST','/api/strokes', {'points':[{'x':0,'y':0},{'x':10,'y':0},{'x':20,'y':0}], 'color':'red','width':6}); self.assertEqual(status,201)
+        payload={'originals':[{'id':s['id'],'version':99}], 'fragments':[{'points':[{'x':0,'y':0},{'x':5,'y':0}],'color':'red','width':6}]}
+        self.assertEqual(self.request('POST','/api/strokes/batch',payload)[0],409)
+        self.assertEqual(len(self.request('GET','/api/strokes')[1]),1)
+
 if __name__ == '__main__': unittest.main()
