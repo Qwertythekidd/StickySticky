@@ -1,4 +1,6 @@
-# Cort's Sticky Board
+# Sticky-Sticky
+
+A simple, draggable notes board for tracking tasks and priorities.
 
 Local-only sticky-note board. Start with `python3 server.py`, then open http://127.0.0.1:8765.
 
