@@ -121,40 +121,18 @@ function Note({ n, onUpdate, onDelete, zoom }) {
   );
 }
 function DrawLayer({ strokes, tool, onDraw, zoom, width, height }) {
-  const ref = useRef(null),
-    drawing = useRef(null);
-  useEffect(() => {
-    const c = ref.current,
-      ctx = c.getContext("2d");
-    c.width = width;
-    c.height = height;
-    ctx.clearRect(0, 0, c.width, c.height);
-    strokes
-      .filter((s) => !s.deleted)
-      .forEach((s) => {
-        ctx.beginPath();
-        s.points.forEach((p, i) =>
-          i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y),
-        );
-        ctx.strokeStyle = s.color;
-        ctx.lineWidth = s.width;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.globalCompositeOperation = s.erased
-          ? "destination-out"
-          : "source-over";
-        ctx.stroke();
-      });
-    ctx.globalCompositeOperation = "source-over";
-  }, [strokes, width, height]);
+  const ref = useRef(null), drawing = useRef(null);
+  const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const point = (e) => {
     const r = ref.current.getBoundingClientRect();
     return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom };
   };
   return (
-    <canvas
+    <svg
       ref={ref}
       className="draw"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
       onPointerDown={(e) => {
         if (tool === "select") return;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -165,14 +143,6 @@ function DrawLayer({ strokes, tool, onDraw, zoom, width, height }) {
         const p = point(e),
           last = drawing.current.at(-1);
         drawing.current.push(p);
-        const ctx = ref.current.getContext("2d");
-        ctx.beginPath();
-        ctx.moveTo(last.x, last.y);
-        ctx.lineTo(p.x, p.y);
-        ctx.strokeStyle = tool === "eraser" ? "#fffdf8" : "#625276";
-        ctx.lineWidth = tool === "eraser" ? 28 : 6;
-        ctx.lineCap = "round";
-        ctx.stroke();
       }}
       onPointerUp={() => {
         if (drawing.current) {
@@ -180,7 +150,14 @@ function DrawLayer({ strokes, tool, onDraw, zoom, width, height }) {
           drawing.current = null;
         }
       }}
-    />
+    >
+      {strokes.filter((s) => !s.deleted).map((s) => (
+        <path key={s.id} d={path(s.points)} fill="none" stroke={s.erased ? "#fffdf8" : s.color}
+          strokeWidth={s.erased ? 28 : s.width} strokeLinecap="round" strokeLinejoin="round" />
+      ))}
+      {drawing.current && <path d={path(drawing.current)} fill="none" stroke={tool === "eraser" ? "#fffdf8" : "#625276"}
+        strokeWidth={tool === "eraser" ? 28 : 6} strokeLinecap="round" strokeLinejoin="round" />}
+    </svg>
   );
 }
 function App() {
@@ -223,6 +200,7 @@ function App() {
           api("/strokes").catch(() => []),
         ]);
         setBoard(b);
+        setBoardPct(Math.max(25, Math.min(10000, Math.round((b.width / 1600) * 100))));
         setNotes(ns);
         setStrokes(Array.isArray(ss) ? ss : ss.strokes || []);
       } catch {
@@ -286,38 +264,45 @@ function App() {
       setStrokes((x) => [...x, { ...s, id: crypto.randomUUID() }]);
     }
   }
-  const scaled = boardPct / 100;
   const gutter = Math.min(192, Math.max(24, viewport.width * 0.15));
   const fit = Math.min(
-    (viewport.width - gutter * 2) / (board.width * scaled + 36),
-    (viewport.height - gutter * 2) / (board.height * scaled + 36),
+    (viewport.width - gutter * 2) / (board.width + 36),
+    (viewport.height - gutter * 2) / (board.height + 36),
   );
   const sceneScale = Math.min(1, fit) * zoom;
-  const sceneWidth = (board.width * scaled + 36) * sceneScale;
-  const sceneHeight = (board.height * scaled + 36) * sceneScale;
+  const sceneWidth = (board.width + 36) * sceneScale;
+  const sceneHeight = (board.height + 36) * sceneScale;
   const maxPanX = Math.max(0, (sceneWidth - (viewport.width - gutter * 2)) / 2);
   const maxPanY = Math.max(0, (sceneHeight - (viewport.height - gutter * 2)) / 2);
   const clampPan = (p) => ({
     x: Math.max(-maxPanX, Math.min(maxPanX, p.x)),
     y: Math.max(-maxPanY, Math.min(maxPanY, p.y)),
   });
-  useEffect(() => setPan((p) => clampPan(p)), [boardPct, zoom, viewport, board.width, board.height]);
+  useEffect(() => setPan((p) => clampPan(p)), [zoom, viewport, board.width, board.height]);
+  useEffect(() => {
+    const next = Math.round(1600 * boardPct / 100);
+    const nextHeight = Math.round(1100 * boardPct / 100);
+    if (board.width !== next || board.height !== nextHeight) {
+      setBoard((b) => ({ ...b, width: next, height: nextHeight }));
+      saveBoard({ width: next, height: nextHeight });
+    }
+  }, [boardPct]);
   return (
     <div className="app">
       <main className="stage">
         <section
           className="board-shell"
           style={{
-            width: board.width * scaled,
-            height: board.height * scaled,
+            width: board.width,
+            height: board.height,
             transform: `translate(calc(-50% + ${pan.x}px),calc(-50% + ${pan.y}px)) scale(${sceneScale})`,
           }}
         >
           <div
             className="board"
             style={{
-              width: board.width * scaled,
-              height: board.height * scaled,
+              width: board.width,
+              height: board.height,
             }}
             onPointerDown={(e) => {
               if (tool !== "select" || e.target !== e.currentTarget) return;
@@ -430,11 +415,11 @@ function App() {
       </div>
       <div className="controls">
         <span>Board size</span>
-        <button onClick={() => setBoardPct(Math.max(65, boardPct - 10))}>
+        <button onClick={() => setBoardPct(Math.max(25, boardPct - 10))}>
           −
         </button>
         <b>{boardPct}%</b>
-        <button onClick={() => setBoardPct(Math.min(140, boardPct + 10))}>
+        <button onClick={() => setBoardPct(Math.min(10000, boardPct + 10))}>
           ＋
         </button>
         <i />

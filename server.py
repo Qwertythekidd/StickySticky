@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """HTTP/SQLite backend for Sticky-Sticky."""
-import json, os, sqlite3, uuid
+import json, math, os, sqlite3, uuid
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -66,6 +66,12 @@ class Handler(SimpleHTTPRequestHandler):
         if payload.get("version") is not None and int(payload["version"]) != row["version"]: self.send_json(409,{"error":"conflict","current_version":row["version"]})
         else:
             vals = {k:payload[k] for k in ("title","subtitle","width","height") if k in payload}
+            for key in ("width", "height"):
+                if key in vals:
+                    try: value = float(vals[key])
+                    except (TypeError, ValueError): value = 0
+                    if not math.isfinite(value) or value < 400 or value > 10000000:
+                        self.send_json(400, {"error": f"invalid_{key}"}); c.close(); return
             if vals: c.execute("UPDATE board_settings SET " + ",".join(f"{k}=?" for k in vals) + ",version=version+1 WHERE id=1", (*vals.values(),)); c.commit()
             self.send_json(200,dict(c.execute("SELECT title,subtitle,width,height,version FROM board_settings WHERE id=1").fetchone()))
         c.close()
