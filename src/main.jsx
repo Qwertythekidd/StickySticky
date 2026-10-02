@@ -131,8 +131,10 @@ function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom,
   const ref = useRef(null), drawing = useRef(null), cursor = useRef(null), [, repaint] = React.useState(0);
   const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const point = (e) => {
-    const r = ref.current.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom };
+    const svg = ref.current, matrix = svg?.getScreenCTM()?.inverse();
+    if (!matrix) return null;
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(matrix);
+    return Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: p.x, y: p.y } : null;
   };
   return (
     <svg
@@ -141,26 +143,28 @@ function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom,
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
       onPointerDown={(e) => {
-        if (tool === "select") return;
+        if (tool === "select" || e.button !== 0) return;
         e.currentTarget.setPointerCapture(e.pointerId);
-        drawing.current = [point(e)];
+        const p = point(e); if (!p) return;
+        drawing.current = [p];
         repaint(x => x + 1);
       }}
       onPointerMove={(e) => {
-        const r = ref.current.getBoundingClientRect();
-        if (cursor.current) { cursor.current.setAttribute("cx", (e.clientX - r.left) / zoom); cursor.current.setAttribute("cy", (e.clientY - r.top) / zoom); }
+        const p = point(e);
+        if (cursor.current && p) { cursor.current.setAttribute("cx", p.x); cursor.current.setAttribute("cy", p.y); }
         if (!drawing.current) return;
-        const p = point(e),
-          last = drawing.current.at(-1);
+        if (!p) return;
         drawing.current.push(p);
         repaint(x => x + 1);
       }}
-      onPointerUp={() => {
+      onPointerUp={(e) => {
         if (drawing.current) {
           onDraw(drawing.current, tool);
           drawing.current = null;
         }
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
       }}
+      onPointerCancel={() => { drawing.current = null; }}
       onPointerLeave={() => { if (cursor.current) cursor.current.setAttribute("visibility", "hidden"); }}
       onPointerEnter={() => { if (cursor.current) cursor.current.setAttribute("visibility", tool === "select" ? "hidden" : "visible"); }}
     >
