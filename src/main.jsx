@@ -159,7 +159,7 @@ function DrawLayer({ strokes, tool, color, eraserSize, onDraw, zoom, width, heig
         }
       }}
       onPointerLeave={() => { if (cursor.current) cursor.current.setAttribute("visibility", "hidden"); }}
-      onPointerEnter={() => { if (cursor.current) cursor.current.setAttribute("visibility", "visible"); }}
+      onPointerEnter={() => { if (cursor.current) cursor.current.setAttribute("visibility", tool === "select" ? "hidden" : "visible"); }}
     >
       {strokes.filter((s) => !s.deleted).map((s) => (
         <path key={s.id} d={path(s.points)} fill="none" stroke={s.color}
@@ -407,7 +407,7 @@ function App() {
   }
   return (
     <div className="app">
-      <main className="stage" style={{ cursor: tool === "pen" ? "crosshair" : tool === "eraser" ? "none" : undefined }} onWheel={onWheel}>
+      <main className="stage" style={{ cursor: tool === "pen" || tool === "eraser" ? "none" : undefined }} onWheel={onWheel}>
         <SceneLayer preset={scene} scene={sceneConfig} pan={anchorPan} scale={sceneScale}>
         <CameraLayer board={board} scene={sceneConfig} pan={pan} sceneScale={sceneScale}>
           <Board
