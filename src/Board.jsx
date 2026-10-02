@@ -19,6 +19,8 @@ const Board = forwardRef(function Board(
     onPointerMove,
     onPointerUp,
     onPointerCancel,
+    onDrop,
+    onDragOver,
     children,
   },
   ref,
@@ -32,6 +34,8 @@ const Board = forwardRef(function Board(
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
     >
       <input
         className="board-title"
