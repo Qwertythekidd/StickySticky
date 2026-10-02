@@ -306,6 +306,11 @@ function App() {
       saveBoard({ width: next, height: nextHeight });
     }
   }, [widthPct, heightPct]);
+  async function updateScene(patch) {
+    const next = { ...sceneConfig, ...patch };
+    try { setSceneConfig(await api("/scene", { method: "PUT", body: JSON.stringify({ ...next, version: sceneConfig.version }) })); }
+    catch { setConflict(true); }
+  }
   return (
     <div className="app">
       <main className="stage" onWheel={onWheel}>
@@ -403,6 +408,11 @@ function App() {
         <button onClick={async () => { const preset = scene === "window" ? "sunset" : "window"; setScene(preset); try { const next = await api("/scene", { method: "PUT", body: JSON.stringify({ ...sceneConfig, preset, version: sceneConfig.version }) }); setSceneConfig(next); } catch { setConflict(true); } }}>
           Scene: {scene}
         </button>
+        <button onClick={() => updateScene({ scene_width: Math.max(board.width + 20000, sceneConfig.scene_width - 10000) })}>Scene W−</button>
+        <button onClick={() => updateScene({ scene_width: sceneConfig.scene_width + 10000 })}>Scene W＋</button>
+        <button onClick={() => updateScene({ scene_height: Math.max(board.height + 20000, sceneConfig.scene_height - 10000) })}>Scene H−</button>
+        <button onClick={() => updateScene({ scene_height: sceneConfig.scene_height + 10000 })}>Scene H＋</button>
+        <button onClick={() => updateScene({ frame_style: sceneConfig.frame_style === "paper" ? "wood" : "paper" })}>Frame: {sceneConfig.frame_style}</button>
         <button
           className={tool === "pen" ? "active" : ""}
           onClick={() => {
