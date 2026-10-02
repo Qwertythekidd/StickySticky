@@ -330,7 +330,12 @@ function App() {
     const pointer = { x: e.clientX - rect.left - viewport.width / 2, y: e.clientY - rect.top - viewport.height / 2 };
     const world = { x: (pointer.x - cameraPan.x) / sceneScale, y: (pointer.y - cameraPan.y) / sceneScale };
     setZoom(nextZoom);
-    setPan(clampPan({ x: pointer.x - world.x * (sceneScale * nextZoom / zoom) - anchorPan.x, y: pointer.y - world.y * (sceneScale * nextZoom / zoom) - anchorPan.y }));
+    const nextScale = sceneScale * nextZoom / zoom;
+    const nextAnchor = {
+      x: (sceneConfig.scene_width * nextScale) / 2 - (sceneConfig.board_x + board.width / 2) * nextScale,
+      y: (sceneConfig.scene_height * nextScale) / 2 - (sceneConfig.board_y + board.height / 2) * nextScale,
+    };
+    setPan(clampPan({ x: pointer.x - world.x * nextScale - nextAnchor.x, y: pointer.y - world.y * nextScale - nextAnchor.y }));
   };
   useEffect(() => setPan((p) => clampPan(p)), [zoom, viewport, board.width, board.height]);
   useEffect(() => {
