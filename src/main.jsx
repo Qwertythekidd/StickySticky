@@ -465,9 +465,20 @@ function App() {
     try { setSceneConfig(await api("/scene", { method: "PUT", body: JSON.stringify({ ...next, version: sceneConfig.version }) })); }
     catch { setConflict(true); }
   }
+  const restoreFromDrop = async (e) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/sticky-id");
+    const n = trash.find(x => String(x.id) === String(id));
+    if (!n) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    try {
+      const restored = await api("/notes/" + n.id, { method: "PATCH", body: JSON.stringify({ restore: true, x: (e.clientX - r.left) / sceneScale - 118, y: (e.clientY - r.top) / sceneScale - 80, version: n.version + 1 }) });
+      setNotes(x => [...x, restored]); setTrash(x => x.filter(v => v.id !== n.id));
+    } catch { setConflict(true); }
+  };
   return (
     <div className="app">
-      <main className="stage" style={{ cursor: tool === "pen" || tool === "eraser" ? "none" : undefined }} onWheel={onWheel}>
+      <main className="stage" onWheel={onWheel}>
         <SceneLayer preset={scene} scene={sceneConfig} pan={anchorPan} scale={sceneScale}>
         <CameraLayer board={board} scene={sceneConfig} pan={pan} sceneScale={sceneScale}>
           <Board
@@ -496,6 +507,8 @@ function App() {
             onPointerUp={() => (panDrag.current = null)}
             onContextMenu={(e) => { if (tool !== "select") { e.preventDefault(); setTool("select"); setMarker(false); } }}
             onPointerCancel={() => (panDrag.current = null)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={restoreFromDrop}
           >
             <DrawLayer
               strokes={strokes}
