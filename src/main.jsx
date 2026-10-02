@@ -351,8 +351,8 @@ function App() {
   return (
     <div className="app">
       <main className="stage" onWheel={onWheel}>
-        <SceneLayer preset={scene} scene={sceneConfig} pan={cameraPan} scale={sceneScale}>
-        <CameraLayer board={board} scene={sceneConfig} pan={{x: 0, y: 0}} sceneScale={sceneScale}>
+        <SceneLayer preset={scene} scene={sceneConfig} pan={anchorPan} scale={sceneScale}>
+        <CameraLayer board={board} scene={sceneConfig} pan={pan} sceneScale={sceneScale}>
           <Board
             width={board.width}
             height={board.height}
