@@ -1,0 +1,2 @@
+/* Second-pass whiteboard surface: framed paper, intentionally no grid or dots. */
+.board{border:18px solid #eadfd2;box-shadow:inset 0 0 0 2px #fff,0 8px 24px #563d451c}
