@@ -242,6 +242,7 @@ function App() {
     [form, setForm] = useState({ title: "", body: "", color: "yellow" }),
     [conflict, setConflict] = useState(false),
     [shrinkNotice, setShrinkNotice] = useState("");
+  const [trashOpen, setTrashOpen] = useState(false);
   const panDrag = useRef(null);
   const paletteDrag = useRef(null);
   const cameraReady = useRef(false);
@@ -527,7 +528,12 @@ function App() {
           <button onClick={() => setConflict(false)}>Keep my view</button>
         </div>
       )}
-      <button className="trash-drop" data-trash type="button" aria-label="Trash notes" onClick={() => document.querySelector(".note:focus")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }))}>🗑</button>
+      <button className="trash-drop" data-trash type="button" aria-label="Trash notes" onClick={() => setTrashOpen(x => !x)}>🗑<span>{trash.length || ""}</span></button>
+      {trashOpen && <aside className="trash-tray" aria-label="Trash">
+        <strong>Trash</strong>
+        <div className="trash-list">{trash.map(n => <button key={n.id} className="trash-item" onClick={async () => { try { const restored = await api("/notes/" + n.id, { method:"PATCH", body:JSON.stringify({restore:true,version:n.version+1}) }); setNotes(x=>[...x,restored]); setTrash(x=>x.filter(v=>v.id!==n.id)); } catch { setConflict(true); } }}>{n.title || "Untitled note"}</button>)}</div>
+        <button className="empty-trash" disabled title="Permanent deletion requires explicit authorization">Empty Trash</button>
+      </aside>}
       <div className="toolbar">
         <button className="new" onClick={() => { setOpen(x=>!x); setTool("select"); }}>
           ＋ New note
