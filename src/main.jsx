@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import Board from "./Board.jsx";
+import { clipPolyline } from "./eraseGeometry.js";
 import "./styles.css";
 const seed = [
   [
@@ -340,9 +341,8 @@ function App() {
       const radius = eraserRef.current / 2;
       const fragments=[]; const hit=[];
       for (const s of strokesRef.current.filter(s=>!s.deleted)) {
-        let kept=s.points, changed=false;
-        for (let i=1;i<points.length;i++) { const next=[]; for(let j=1;j<kept.length;j++) { if(segmentDistance(kept[j-1],kept[j],points[i-1],points[i])<=radius+s.width/2) changed=true; else next.push([kept[j-1],kept[j]]); } if(changed) kept=next.flat().filter((p,k,a)=>!k||p!==a[k-1]); }
-        if(changed) { hit.push(s); for(let i=1;i<kept.length;i+=2) if(kept[i]) fragments.push({points:[kept[i-1],kept[i]],color:s.color,width:s.width}); }
+        const clipped=clipPolyline(s.points,points,radius,s.width);
+        if(clipped.changed) { hit.push(s); for(const fragment of clipped.polylines) fragments.push({points:fragment,color:s.color,width:s.width}); }
       }
       if (!hit.length) return;
       try { const result=await api("/strokes/batch",{method:"POST",body:JSON.stringify({originals:hit.map(s=>({id:s.id,version:s.version})),fragments})});
@@ -546,7 +546,7 @@ function App() {
             >
               Eraser
             </button>
-            <label className="eraser-size">Diameter <input aria-label="Eraser diameter" type="range" min="12" max="72" step="4" value={eraserSize} onChange={(e) => setEraserSize(Number(e.target.value))} /></label>
+            <label className="eraser-size">Eraser diameter <input aria-label="Eraser diameter" type="range" min="12" max="72" step="4" value={eraserSize} onChange={(e) => setEraserSize(Number(e.target.value))} /></label>
             <label className="marker-size">Marker diameter <input aria-label="Marker diameter" type="range" min="2" max="32" step="1" value={markerSize} onChange={(e) => setMarkerSize(Number(e.target.value))} /></label>
           </div>
         )}

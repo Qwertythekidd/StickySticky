@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { clipPolyline } from "./eraseGeometry.js";
+const p=(x,y)=>({x,y}); const line=(a,b)=>[p(a,0),p(b,0)];
+let r=clipPolyline(line(0,10),[p(5,-5),p(5,5)],1); assert.equal(r.polylines.length,2); assert.deepEqual(r.polylines.map(x=>[x[0].x,x.at(-1).x]),[[0,4],[6,10]]);
+r=clipPolyline([p(0,0),p(2,0),p(4,0),p(6,0),p(8,0),p(10,0)],[p(5,-2),p(5,2)],.5); assert.equal(r.polylines.length,2); assert.equal(r.polylines[0].length,4);
+r=clipPolyline(line(0,10),[p(0,-2),p(0,2)],1); assert.equal(r.polylines[0][0].x,1);
+r=clipPolyline(line(0,10),[p(4,-2),p(6,2),p(4,2),p(6,-2)],1); assert.equal(r.polylines.length,2);
+const original=line(0,10); r=clipPolyline(original,[p(20,20),p(20,21)],1); assert.equal(r.changed,false); assert.strictEqual(r.polylines,original);
+r=clipPolyline(line(0,10),[p(5,0),p(5,0)],0); assert.equal(r.changed,true);
+r=clipPolyline(line(0,10),[p(5,-2),p(5,2)],.5,1); assert.equal(r.polylines[0].at(-1).x,4);
+console.log("eraseGeometry tests: 7 passed; sparse endpoints",JSON.stringify([[0,4],[6,10]]),"dense lengths",JSON.stringify(r.polylines.map(x=>x.length)));
