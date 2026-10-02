@@ -527,8 +527,8 @@ function App() {
           <button onClick={() => setConflict(false)}>Keep my view</button>
         </div>
       )}
+      <button className="trash-drop" data-trash type="button" aria-label="Trash notes" onClick={() => document.querySelector(".note:focus")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }))}>🗑</button>
       <div className="toolbar">
-        <button className="trash-drop" data-trash type="button" aria-label="Trash notes" onClick={() => document.querySelector(".note:focus")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }))}>🗑</button>
         <button className="new" onClick={() => { setOpen(x=>!x); setTool("select"); }}>
           ＋ New note
         </button>
