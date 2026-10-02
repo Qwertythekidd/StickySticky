@@ -97,7 +97,9 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
         }
       }}
       onPointerCancel={() => { drag.current = null; }}
-      onLostPointerCapture={() => { drag.current = null; }}
+      // Browsers may briefly report lost capture while the note is rerendered
+      // during a sustained drag; keep the gesture alive until pointerup/cancel.
+      onLostPointerCapture={() => {}}
       onKeyDown={(e) => {
         if ((e.key === "Delete" || e.key === "Backspace") && !e.target.closest("[contenteditable],input,button")) {
           e.preventDefault();
