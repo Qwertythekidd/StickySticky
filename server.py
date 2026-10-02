@@ -18,6 +18,7 @@ def db(path=DB):
     CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,title TEXT NOT NULL,body TEXT NOT NULL,color TEXT NOT NULL,stamp TEXT NOT NULL,x REAL NOT NULL,y REAL NOT NULL,done INTEGER NOT NULL DEFAULT 0,version INTEGER NOT NULL DEFAULT 1,deleted_at TEXT);
     CREATE TABLE IF NOT EXISTS board_settings(id INTEGER PRIMARY KEY CHECK(id=1),title TEXT NOT NULL DEFAULT '',subtitle TEXT NOT NULL DEFAULT '',width REAL NOT NULL DEFAULT 1600,height REAL NOT NULL DEFAULT 900,version INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE IF NOT EXISTS strokes(id TEXT PRIMARY KEY,points TEXT NOT NULL,color TEXT NOT NULL,width REAL NOT NULL,version INTEGER NOT NULL DEFAULT 1,deleted_at TEXT);
+    CREATE TABLE IF NOT EXISTS scene_settings(id INTEGER PRIMARY KEY CHECK(id=1),preset TEXT NOT NULL DEFAULT 'window',frame_style TEXT NOT NULL DEFAULT 'paper',scene_width REAL NOT NULL DEFAULT 200000,scene_height REAL NOT NULL DEFAULT 150000,board_x REAL NOT NULL DEFAULT 9918,board_y REAL NOT NULL DEFAULT 7450,version INTEGER NOT NULL DEFAULT 1);
     """)
     c.execute("INSERT OR IGNORE INTO board_settings(id) VALUES(1)"); c.commit(); return c
 
@@ -39,6 +40,7 @@ class Handler(SimpleHTTPRequestHandler):
         p = self.parts(); c = db(self.db_path)
         if p == ["api","notes"]: out = [dict(r) for r in c.execute("SELECT * FROM notes WHERE deleted_at IS NULL ORDER BY rowid")]
         elif p == ["api","board"]: out = dict(c.execute("SELECT title,subtitle,width,height,version FROM board_settings WHERE id=1").fetchone())
+        elif p == ["api","scene"]: out = dict(c.execute("SELECT preset,frame_style,scene_width,scene_height,board_x,board_y,version FROM scene_settings WHERE id=1").fetchone())
         elif p == ["api","strokes"]:
             out = [dict(r) for r in c.execute("SELECT * FROM strokes WHERE deleted_at IS NULL ORDER BY rowid")]
             for r in out: r["points"] = json.loads(r["points"])
@@ -59,6 +61,7 @@ class Handler(SimpleHTTPRequestHandler):
         else: self.send_error(404)
         c.close()
     def do_PUT(self):
+        if self.parts() == ["api","scene"]: return self.put_scene()
         if self.parts() != ["api","board"]: self.send_error(404); return
         payload = self.read_body()
         if payload is None: return
@@ -75,6 +78,24 @@ class Handler(SimpleHTTPRequestHandler):
             if vals: c.execute("UPDATE board_settings SET " + ",".join(f"{k}=?" for k in vals) + ",version=version+1 WHERE id=1", (*vals.values(),)); c.commit()
             self.send_json(200,dict(c.execute("SELECT title,subtitle,width,height,version FROM board_settings WHERE id=1").fetchone()))
         c.close()
+    def put_scene(self):
+        payload = self.read_body()
+        if payload is None: return
+        c = db(self.db_path); row = c.execute("SELECT * FROM scene_settings WHERE id=1").fetchone()
+        if payload.get("version") is not None and int(payload["version"]) != row["version"]:
+            self.send_json(409,{"error":"conflict","current_version":row["version"]}); c.close(); return
+        allowed = {"preset","frame_style","scene_width","scene_height","board_x","board_y"}
+        vals = {k:payload[k] for k in allowed if k in payload}
+        if vals.get("preset") not in (None,"window","sunset") or vals.get("frame_style") not in (None,"paper","wood","mint"):
+            self.send_json(400,{"error":"invalid_scene_style"}); c.close(); return
+        for key in ("scene_width","scene_height"):
+            if key in vals and (not isinstance(vals[key],(int,float)) or not math.isfinite(vals[key]) or vals[key] < 1600 or vals[key] > 10000000):
+                self.send_json(400,{"error":f"invalid_{key}"}); c.close(); return
+        if vals.get("scene_width",row["scene_width"]) < row["board_x"] + 1600 or vals.get("scene_height",row["scene_height"]) < row["board_y"] + 1100:
+            self.send_json(400,{"error":"scene_smaller_than_board"}); c.close(); return
+        if vals:
+            c.execute("UPDATE scene_settings SET " + ",".join(f"{k}=?" for k in vals) + ",version=version+1 WHERE id=1", (*vals.values(),)); c.commit()
+        self.send_json(200,dict(c.execute("SELECT preset,frame_style,scene_width,scene_height,board_x,board_y,version FROM scene_settings WHERE id=1").fetchone())); c.close()
     def do_PATCH(self):
         p = self.parts(); payload = self.read_body()
         if payload is None: return
