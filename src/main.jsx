@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import Board from "./Board.jsx";
 import "./styles.css";
 const seed = [
   [
@@ -322,12 +323,16 @@ function App() {
       <main className="stage" onWheel={onWheel}>
         <SceneLayer preset={scene} pan={pan} zoom={zoom} />
         <CameraLayer board={board} pan={pan} sceneScale={sceneScale}>
-          <div
-            className={`board frame-${sceneConfig.frame_style}`}
-            style={{
-              width: board.width,
-              height: board.height,
-            }}
+          <Board
+            width={board.width}
+            height={board.height}
+            frameStyle={sceneConfig.frame_style}
+            title={board.title}
+            subtitle={board.subtitle}
+            onTitleChange={(e) => setBoard({ ...board, title: e.target.value })}
+            onTitleBlur={(e) => saveBoard({ title: e.target.value })}
+            onSubtitleChange={(e) => setBoard({ ...board, subtitle: e.target.value })}
+            onSubtitleBlur={(e) => saveBoard({ subtitle: e.target.value })}
             onPointerDown={(e) => {
               if (tool !== "select" || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
               panDrag.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
@@ -343,18 +348,6 @@ function App() {
             onPointerUp={() => (panDrag.current = null)}
             onPointerCancel={() => (panDrag.current = null)}
           >
-            <input
-              className="board-title"
-              value={board.title}
-              onChange={(e) => setBoard({ ...board, title: e.target.value })}
-              onBlur={(e) => saveBoard({ title: e.target.value })}
-            />
-            <input
-              className="board-subtitle"
-              value={board.subtitle}
-              onChange={(e) => setBoard({ ...board, subtitle: e.target.value })}
-              onBlur={(e) => saveBoard({ subtitle: e.target.value })}
-            />
             <DrawLayer
               strokes={strokes}
               tool={tool}
@@ -372,7 +365,7 @@ function App() {
                 onDelete={remove}
               />
             ))}
-          </div>
+          </Board>
         </CameraLayer>
       </main>
       {conflict && (
