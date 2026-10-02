@@ -125,7 +125,7 @@ function Note({ n, onUpdate, onDelete, zoom }) {
     </article>
   );
 }
-function DrawLayer({ strokes, tool, color, onDraw, zoom, width, height }) {
+function DrawLayer({ strokes, tool, color, eraserSize, onDraw, zoom, width, height }) {
   const ref = useRef(null), drawing = useRef(null);
   const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const point = (e) => {
@@ -161,7 +161,7 @@ function DrawLayer({ strokes, tool, color, onDraw, zoom, width, height }) {
           strokeWidth={s.erased ? 28 : s.width} strokeLinecap="round" strokeLinejoin="round" />
       ))}
       {drawing.current && <path d={path(drawing.current)} fill="none" stroke={tool === "eraser" ? "#fffdf8" : color}
-        strokeWidth={tool === "eraser" ? 28 : 6} strokeLinecap="round" strokeLinejoin="round" />}
+        strokeWidth={tool === "eraser" ? eraserSize : 6} strokeLinecap="round" strokeLinejoin="round" />}
     </svg>
   );
 }
@@ -212,6 +212,7 @@ function App() {
     [tool, setTool] = useState("select"),
     [marker, setMarker] = useState(false),
     [markerColor, setMarkerColor] = useState("#625276"),
+    [eraserSize, setEraserSize] = useState(28),
     [scene, setScene] = useState("window"),
     [open, setOpen] = useState(false),
     [form, setForm] = useState({ title: "", body: "", color: "yellow" }),
@@ -287,6 +288,12 @@ function App() {
     setOpen(false);
   }
   async function draw(points, mode) {
+    if (mode === "eraser") {
+      const hit = strokes.find((s) => s.points?.some((p) => points.some((q) => Math.hypot(p.x - q.x, p.y - q.y) <= eraserSize / 2)));
+      if (!hit?.id) return;
+      try { await api("/strokes/" + hit.id, { method: "DELETE" }); setStrokes((xs) => xs.map((s) => s.id === hit.id ? { ...s, deleted: true } : s)); } catch { setConflict(true); }
+      return;
+    }
     const s = { points, color: markerColor, width: 6, erased: mode === "eraser" };
     try {
       const saved = await api("/strokes", {
@@ -389,6 +396,7 @@ function App() {
               strokes={strokes}
               tool={tool}
               color={markerColor}
+              eraserSize={eraserSize}
               onDraw={draw}
               zoom={sceneScale}
               width={board.width}
@@ -472,6 +480,7 @@ function App() {
             >
               Eraser
             </button>
+            <label className="eraser-size">Diameter <input aria-label="Eraser diameter" type="range" min="12" max="72" step="4" value={eraserSize} onChange={(e) => setEraserSize(Number(e.target.value))} /></label>
           </div>
         )}
       </div>
