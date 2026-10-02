@@ -397,7 +397,7 @@ function App() {
   }
   const noteAngle = (n) => ((((String(n.id).charCodeAt(0) || 3) % 7) - 3) * Math.PI) / 180;
   const toNoteLocal = (p, n) => {
-    const a = -noteAngle(n), cx = 117.5, cy = 87;
+    const a = noteAngle(n), cx = 117.5, cy = 87;
     const x = p.x - n.x - cx, y = p.y - n.y - cy;
     return { x: x * Math.cos(a) - y * Math.sin(a) + cx, y: x * Math.sin(a) + y * Math.cos(a) + cy };
   };
