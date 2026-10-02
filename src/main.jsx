@@ -181,7 +181,9 @@ function App() {
     }),
     [strokes, setStrokes] = useState([]),
     [zoom, setZoom] = useState(1),
-    [boardPct, setBoardPct] = useState(100),
+    [widthPct, setWidthPct] = useState(100),
+    [heightPct, setHeightPct] = useState(100),
+    [sceneConfig, setSceneConfig] = useState({ preset: "window", frame_style: "paper", scene_width: 200000, scene_height: 150000, board_x: 9918, board_y: 7450, version: 1 }),
     [viewport, setViewport] = useState({ width: innerWidth, height: innerHeight }),
     [pan, setPan] = useState({ x: 0, y: 0 }),
     [tool, setTool] = useState("select"),
@@ -199,13 +201,16 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [b, ns, ss] = await Promise.all([
+        const [b, ns, ss, sc] = await Promise.all([
           api("/board").catch(() => board),
           api("/notes"),
           api("/strokes").catch(() => []),
+          api("/scene").catch(() => null),
         ]);
         setBoard(b);
-        setBoardPct(Math.max(25, Math.min(10000, Math.round((b.width / 1600) * 100))));
+        setWidthPct(Math.max(25, Math.min(10000, Math.round((b.width / 1600) * 100))));
+        setHeightPct(Math.max(25, Math.min(10000, Math.round((b.height / 1100) * 100))));
+        if (sc) setSceneConfig(sc);
         setNotes(ns);
         setStrokes(Array.isArray(ss) ? ss : ss.strokes || []);
       } catch {
@@ -294,13 +299,13 @@ function App() {
   };
   useEffect(() => setPan((p) => clampPan(p)), [zoom, viewport, board.width, board.height]);
   useEffect(() => {
-    const next = Math.round(1600 * boardPct / 100);
-    const nextHeight = Math.round(1100 * boardPct / 100);
+    const next = Math.round(1600 * widthPct / 100);
+    const nextHeight = Math.round(1100 * heightPct / 100);
     if (board.width !== next || board.height !== nextHeight) {
       setBoard((b) => ({ ...b, width: next, height: nextHeight }));
       saveBoard({ width: next, height: nextHeight });
     }
-  }, [boardPct]);
+  }, [widthPct, heightPct]);
   return (
     <div className="app">
       <main className="stage" onWheel={onWheel}>
@@ -395,7 +400,7 @@ function App() {
         >
           ↶ Undo
         </button>
-        <button onClick={() => setScene((x) => (x === "window" ? "sunset" : "window"))}>
+        <button onClick={async () => { const preset = scene === "window" ? "sunset" : "window"; setScene(preset); try { const next = await api("/scene", { method: "PUT", body: JSON.stringify({ ...sceneConfig, preset, version: sceneConfig.version }) }); setSceneConfig(next); } catch { setConflict(true); } }}>
           Scene: {scene}
         </button>
         <button
@@ -435,14 +440,18 @@ function App() {
         )}
       </div>
       <div className="controls">
-        <span>Board size</span>
-        <button onClick={() => setBoardPct(Math.max(25, boardPct - 10))}>
+        <span>Width</span>
+        <button onClick={() => setWidthPct(Math.max(25, widthPct - 10))}>
           −
         </button>
-        <b>{boardPct}%</b>
-        <button onClick={() => setBoardPct(Math.min(10000, boardPct + 10))}>
+        <b>{widthPct}%</b>
+        <button onClick={() => setWidthPct(Math.min(10000, widthPct + 10))}>
           ＋
         </button>
+        <span>Height</span>
+        <button onClick={() => setHeightPct(Math.max(25, heightPct - 10))}>−</button>
+        <b>{heightPct}%</b>
+        <button onClick={() => setHeightPct(Math.min(10000, heightPct + 10))}>＋</button>
         <i />
         <span>Zoom</span>
         <button onClick={() => setZoom(Math.max(0.45, zoom - 0.1))}>−</button>
