@@ -197,7 +197,7 @@ function CameraLayer({ children, board, scene, pan, sceneScale }) {
 }
 function App() {
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && setMarker(false);
+    const onKey = (e) => { if (e.key === "Escape") { setMarker(false); setOpen(false); paletteDrag.current = null; } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -226,6 +226,19 @@ function App() {
     [form, setForm] = useState({ title: "", body: "", color: "yellow" }),
     [conflict, setConflict] = useState(false);
   const panDrag = useRef(null);
+  const paletteDrag = useRef(null);
+  useEffect(() => {
+    const move = (e) => { if (paletteDrag.current) paletteDrag.current.last = { x:e.clientX, y:e.clientY }; };
+    const up = async (e) => {
+      const d=paletteDrag.current; if (!d) return; paletteDrag.current=null;
+      const el=document.elementFromPoint(e.clientX,e.clientY), boardEl=el?.closest(".board");
+      if (!boardEl) return;
+      const r=boardEl.getBoundingClientRect();
+      await addAt((e.clientX-r.left)/sceneScale,(e.clientY-r.top)/sceneScale,d.color);
+    };
+    addEventListener("pointermove",move); addEventListener("pointerup",up);
+    return () => { removeEventListener("pointermove",move); removeEventListener("pointerup",up); };
+  }, [sceneScale]);
   useEffect(() => {
     const onResize = () => setViewport({ width: innerWidth, height: innerHeight });
     addEventListener("resize", onResize);
@@ -408,7 +421,7 @@ function App() {
             onSubtitleChange={(e) => setBoard({ ...board, subtitle: e.target.value })}
             onSubtitleBlur={(e) => saveBoard({ subtitle: e.target.value })}
             onPointerDown={(e) => {
-              if (open) { if (e.target.closest("input,textarea,select,button,.note")) return; const r=e.currentTarget.getBoundingClientRect(); addAt((e.clientX-r.left)/sceneScale,(e.clientY-r.top)/sceneScale,form.color); return; }
+              if (open) { if (paletteDrag.current) return; if (e.target.closest("input,textarea,select,button,.note")) return; const r=e.currentTarget.getBoundingClientRect(); addAt((e.clientX-r.left)/sceneScale,(e.clientY-r.top)/sceneScale,form.color); return; }
               if (tool !== "select" || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
               panDrag.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -460,7 +473,7 @@ function App() {
         </button>
         {open && <div className="marker-pop note-palette" role="dialog" aria-label="Choose note color">
           <b>Choose a color, then click the board</b>
-          {colors.map(c=><button key={c} className={`cap ${c} ${form.color===c?"active":""}`} onClick={()=>setForm(f=>({...f,color:c}))}>{c}</button>)}
+          {colors.map(c=><button key={c} className={`cap ${c} ${form.color===c?"active":""}`} onPointerDown={(e)=>{paletteDrag.current={color:c,last:{x:e.clientX,y:e.clientY}}; e.currentTarget.setPointerCapture?.(e.pointerId);}} onClick={()=>setForm(f=>({...f,color:c}))}>{c}</button>)}
           <button onClick={()=>setOpen(false)}>Cancel</button>
         </div>}
         <button
