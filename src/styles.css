@@ -4,3 +4,4 @@
  .trash-drop{position:fixed!important;left:calc(50% - 500px);bottom:22px!important;flex:0 0 auto}
  .trash-drop.drag-over{background:#ffe0e6;border-color:#b85d70;box-shadow:0 0 0 5px #b85d7040,0 8px 30px #bcaea966;transform:scale(1.08)}
  .note-ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0}
+ .scene-background{background-image:url('./assets/storm-clouds.png');background-size:cover;background-position:center}
