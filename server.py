@@ -23,6 +23,8 @@ def db(path=DB):
     """)
     if "cleared_at" not in {r[1] for r in c.execute("PRAGMA table_info(notes)").fetchall()}:
         c.execute("ALTER TABLE notes ADD COLUMN cleared_at TEXT")
+    if "note_id" not in {r[1] for r in c.execute("PRAGMA table_info(strokes)").fetchall()}:
+        c.execute("ALTER TABLE strokes ADD COLUMN note_id TEXT")
     c.execute("INSERT OR IGNORE INTO board_settings(id) VALUES(1)")
     scene_exists = c.execute("SELECT 1 FROM scene_settings WHERE id=1").fetchone()
     c.execute("INSERT OR IGNORE INTO scene_settings(id) VALUES(1)")
@@ -105,7 +107,9 @@ class Handler(SimpleHTTPRequestHandler):
         elif p == ["api","strokes"]:
             if not isinstance(payload.get("points"), list): self.send_json(400,{"error":"points_required"})
             else:
-                sid = payload.get("id",str(uuid.uuid4())); c.execute("INSERT INTO strokes(id,points,color,width) VALUES(?,?,?,?)",(sid,json.dumps(payload["points"]),payload.get("color","#000"),float(payload.get("width",2)))); c.commit(); out = dict(c.execute("SELECT * FROM strokes WHERE id=?",(sid,)).fetchone()); out["points"] = json.loads(out["points"]); self.send_json(201,out)
+                sid = payload.get("id",str(uuid.uuid4())); note_id = payload.get("note_id");
+                if note_id is not None and c.execute("SELECT 1 FROM notes WHERE id=?", (note_id,)).fetchone() is None: self.send_json(400,{"error":"invalid_note_id"}); c.close(); return
+                c.execute("INSERT INTO strokes(id,points,color,width,note_id) VALUES(?,?,?,?,?)",(sid,json.dumps(payload["points"]),payload.get("color","#000"),float(payload.get("width",2)),note_id)); c.commit(); out = dict(c.execute("SELECT * FROM strokes WHERE id=?",(sid,)).fetchone()); out["points"] = json.loads(out["points"]); self.send_json(201,out)
         else: self.send_error(404)
         c.close()
     def do_PUT(self):
