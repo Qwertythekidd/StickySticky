@@ -24,5 +24,13 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(self.request('PATCH',f'/api/strokes/{sid}', {'version':1})[0],409)
         self.assertEqual(self.request('DELETE',f'/api/strokes/{sid}')[0],200); self.assertEqual(self.request('GET','/api/strokes')[1],[])
         self.assertEqual(self.request('PATCH',f'/api/strokes/{sid}', {'restore':True,'version':3})[0],200); self.assertEqual(len(self.request('GET','/api/strokes')[1]),1)
+    def test_scene_defaults_persist_conflict_and_validation(self):
+        self.request('PUT','/api/board', {'width':160000,'height':110000,'version':1})
+        status, scene = self.request('GET','/api/scene'); self.assertEqual(status,200); self.assertGreaterEqual(scene['scene_width'],160000); self.assertGreaterEqual(scene['scene_height'],110000)
+        payload = {'preset':'sunset','frame_style':'wood','scene_width':220000,'scene_height':170000,'board_x':30000,'board_y':30000,'version':scene['version']}
+        self.assertEqual(self.request('PUT','/api/scene',payload)[0],200); fresh=self.request('GET','/api/scene')[1]; self.assertEqual(fresh['preset'],'sunset')
+        self.assertEqual(self.request('PUT','/api/scene',{'preset':'window','version':scene['version']})[0],409)
+        self.assertEqual(self.request('PUT','/api/scene',{'scene_width':float('inf'),'version':fresh['version']})[0],400)
+        self.assertEqual(self.request('PUT','/api/scene',{'scene_width':1000,'version':fresh['version']})[0],400)
 
 if __name__ == '__main__': unittest.main()
