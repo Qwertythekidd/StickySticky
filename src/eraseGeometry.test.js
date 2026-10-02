@@ -9,3 +9,13 @@ const original=line(0,10); r=clipPolyline(original,[p(20,20),p(20,21)],1); asser
 r=clipPolyline(line(0,10),[p(5,0),p(5,0)],0); assert.equal(r.changed,true);
 r=clipPolyline(line(0,10),[p(5,-2),p(5,2)],.5,1); assert.equal(r.polylines[0].at(-1).x,4);
 console.log("eraseGeometry tests: 7 passed; sparse endpoints",JSON.stringify([[0,4],[6,10]]),"dense lengths",JSON.stringify(r.polylines.map(x=>x.length)));
+
+const dense=Array.from({length:101},(_,i)=>({x:i,y:Math.sin(i/8)*3}));
+const brush=[{x:48,y:-8},{x:52,y:8}];
+const denseResult=clipPolyline(dense,brush,1,0);
+assert.equal(denseResult.changed,true); assert.equal(denseResult.polylines.length,2);
+assert.deepEqual(denseResult.polylines[0][0],dense[0]); assert.deepEqual(denseResult.polylines.at(-1).at(-1),dense.at(-1));
+assert.ok(denseResult.polylines[0].length>40 && denseResult.polylines[1].length>40);
+const overlap=clipPolyline(dense,[{x:48,y:-8},{x:52,y:8},{x:49,y:-8}],1,0);
+assert.equal(overlap.polylines.length,2); assert.deepEqual(overlap.polylines[0][0],dense[0]); assert.deepEqual(overlap.polylines.at(-1).at(-1),dense.at(-1));
+console.log("dense 101-vertex evidence",JSON.stringify(denseResult.polylines.map(x=>x.length)),"overlap fragments",overlap.polylines.length);
