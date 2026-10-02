@@ -89,7 +89,8 @@ const fail = (m) => { throw new Error(m); };
   const ratioNote = b.note.w / a.note.w, ratioStroke = b.stroke.w / a.stroke.w;
   if (Math.abs(ratioNote - 1) > 0.08 || Math.abs(ratioStroke - 1) > 0.08)
     fail(`same-zoom world size changed note=${ratioNote} stroke=${ratioStroke}`);
-  const cx = 640, cy = 400;
+  const { width: viewportWidth, height: viewportHeight } = page.viewportSize();
+  const cx = viewportWidth / 2, cy = viewportHeight / 2;
   if (Math.abs((b.board.x + b.board.w/2)-cx) > 8 || Math.abs((b.board.y+b.board.h/2)-cy) > 8) fail('reload camera not centered: ' + JSON.stringify(b.board));
   const zoomPlus = page.locator('.controls button').last(); await zoomPlus.click(); await page.waitForTimeout(100);
   const z = await snap(); if (!(z.note.w > b.note.w && z.stroke.w > b.stroke.w)) fail('zoom did not scale note and stroke');
