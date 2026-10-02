@@ -57,6 +57,7 @@ function Note({ n, onUpdate, onDelete, zoom }) {
   const drag = useRef(null);
   return (
     <article
+      data-note-id={n.id}
       className={"note " + (n.color || "yellow")}
       style={{
         left: n.x || 80,
@@ -294,6 +295,11 @@ function App() {
     setForm({ title: "", body: "", color: "yellow" });
     setOpen(false);
   }
+  async function addAt(x, y, color) {
+    const n = await api("/notes", { method:"POST", body:JSON.stringify({title:"",body:"",color,stamp:"✦",x:Math.max(0,x-118),y:Math.max(0,y-80)}) });
+    setNotes(xs=>[...xs,n]); setOpen(false);
+    requestAnimationFrame(()=>document.querySelector(`.note[data-note-id="${n.id}"] h3`)?.focus());
+  }
   const strokesRef = useRef(strokes), colorRef = useRef(markerColor), eraserRef = useRef(eraserSize), history = useRef([]);
   useEffect(() => { strokesRef.current = strokes; }, [strokes]);
   useEffect(() => { colorRef.current = markerColor; }, [markerColor]);
@@ -402,6 +408,7 @@ function App() {
             onSubtitleChange={(e) => setBoard({ ...board, subtitle: e.target.value })}
             onSubtitleBlur={(e) => saveBoard({ subtitle: e.target.value })}
             onPointerDown={(e) => {
+              if (open) { if (e.target.closest("input,textarea,select,button,.note")) return; const r=e.currentTarget.getBoundingClientRect(); addAt((e.clientX-r.left)/sceneScale,(e.clientY-r.top)/sceneScale,form.color); return; }
               if (tool !== "select" || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
               panDrag.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -448,9 +455,14 @@ function App() {
         </div>
       )}
       <div className="toolbar">
-        <button className="new" onClick={() => setOpen(true)}>
+        <button className="new" onClick={() => { setOpen(x=>!x); setTool("select"); }}>
           ＋ New note
         </button>
+        {open && <div className="marker-pop note-palette" role="dialog" aria-label="Choose note color">
+          <b>Choose a color, then click the board</b>
+          {colors.map(c=><button key={c} className={`cap ${c} ${form.color===c?"active":""}`} onClick={()=>setForm(f=>({...f,color:c}))}>{c}</button>)}
+          <button onClick={()=>setOpen(false)}>Cancel</button>
+        </div>}
         <button
           onClick={async () => {
             const action = history.current.pop(); if (!action) return;
@@ -525,39 +537,6 @@ function App() {
         <b>{Math.round(zoom * 100)}%</b>
         <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))}>＋</button>
       </div>
-      {open && (
-        <div className="dialog">
-          <form className="modal" onSubmit={add}>
-            <h2>Add a little note</h2>
-            <input
-              autoFocus
-              placeholder="A short title"
-              required
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-            />
-            <textarea
-              placeholder="What's on your mind?"
-              value={form.body}
-              onChange={(e) => setForm({ ...form, body: e.target.value })}
-            />
-            <select
-              value={form.color}
-              onChange={(e) => setForm({ ...form, color: e.target.value })}
-            >
-              {colors.map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-            <div className="row">
-              <button type="button" onClick={() => setOpen(false)}>
-                Cancel
-              </button>
-              <button className="primary">Pin it</button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }
