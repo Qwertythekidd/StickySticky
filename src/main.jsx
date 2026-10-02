@@ -266,18 +266,27 @@ function App() {
   }
   const gutter = Math.min(192, Math.max(24, viewport.width * 0.15));
   const fit = Math.min(
-    (viewport.width - gutter * 2) / (board.width + 36),
-    (viewport.height - gutter * 2) / (board.height + 36),
+    (viewport.width - gutter * 2) / (1600 + 36),
+    (viewport.height - gutter * 2) / (1100 + 36),
   );
   const sceneScale = Math.min(1, fit) * zoom;
   const sceneWidth = (board.width + 36) * sceneScale;
   const sceneHeight = (board.height + 36) * sceneScale;
   const maxPanX = Math.max(0, (sceneWidth - (viewport.width - gutter * 2)) / 2);
   const maxPanY = Math.max(0, (sceneHeight - (viewport.height - gutter * 2)) / 2);
-  const clampPan = (p) => ({
-    x: Math.max(-maxPanX, Math.min(maxPanX, p.x)),
-    y: Math.max(-maxPanY, Math.min(maxPanY, p.y)),
-  });
+  const clampPan = (p) => p;
+  const onWheel = (e) => {
+    if (e.target.closest("input,textarea,select,button,.dialog,.marker-pop")) return;
+    e.preventDefault();
+    const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * viewport.height : e.deltaY;
+    const nextZoom = Math.max(0.45, Math.min(1.5, zoom * Math.pow(1.0015, -delta)));
+    if (nextZoom === zoom) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pointer = { x: e.clientX - rect.left - viewport.width / 2, y: e.clientY - rect.top - viewport.height / 2 };
+    const world = { x: (pointer.x - pan.x) / sceneScale, y: (pointer.y - pan.y) / sceneScale };
+    setZoom(nextZoom);
+    setPan(clampPan({ x: pointer.x - world.x * (sceneScale * nextZoom / zoom), y: pointer.y - world.y * (sceneScale * nextZoom / zoom) }));
+  };
   useEffect(() => setPan((p) => clampPan(p)), [zoom, viewport, board.width, board.height]);
   useEffect(() => {
     const next = Math.round(1600 * boardPct / 100);
@@ -289,7 +298,7 @@ function App() {
   }, [boardPct]);
   return (
     <div className="app">
-      <main className="stage">
+      <main className="stage" onWheel={onWheel}>
         <section
           className="board-shell"
           style={{
@@ -305,7 +314,7 @@ function App() {
               height: board.height,
             }}
             onPointerDown={(e) => {
-              if (tool !== "select" || e.target !== e.currentTarget) return;
+              if (tool !== "select" || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
               panDrag.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
               e.currentTarget.setPointerCapture(e.pointerId);
             }}
@@ -336,8 +345,8 @@ function App() {
               tool={tool}
               onDraw={draw}
               zoom={sceneScale}
-              width={board.width * scaled}
-              height={board.height * scaled}
+              width={board.width}
+              height={board.height}
             />
             {notes.map((n) => (
               <Note
