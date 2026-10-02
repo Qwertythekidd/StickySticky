@@ -209,7 +209,6 @@ function SceneLayer({ preset, scene, pan, scale, children }) {
   };
   return <div className="scene-world" style={sceneStyle} aria-hidden="true">
     <div className={`scene-background scene-${preset}`}><div className="scene-sun" /></div>
-    <div className="scene-board-shadow" style={boardStyle} />
     {children}
   </div>;
 }
