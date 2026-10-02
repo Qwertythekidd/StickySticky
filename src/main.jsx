@@ -247,6 +247,7 @@ function App() {
     [conflict, setConflict] = useState(false),
     [shrinkNotice, setShrinkNotice] = useState("");
   const [trashOpen, setTrashOpen] = useState(false);
+  const [trashDragOver, setTrashDragOver] = useState(false);
   const panDrag = useRef(null);
   const paletteDrag = useRef(null);
   const cameraReady = useRef(false);
@@ -567,7 +568,7 @@ function App() {
           <button onClick={() => setConflict(false)}>Keep my view</button>
         </div>
       )}
-      <button className="trash-drop" data-trash type="button" aria-label="Trash notes" onClick={() => setTrashOpen(x => !x)}>🗑<span>{trash.length || ""}</span></button>
+      <button className={`trash-drop${trashDragOver ? " drag-over" : ""}`} data-trash type="button" aria-label="Trash notes" aria-expanded={trashOpen} onClick={() => setTrashOpen(x => !x)} onDragEnter={(e) => { e.preventDefault(); setTrashDragOver(true); }} onDragOver={(e) => e.preventDefault()} onDragLeave={() => setTrashDragOver(false)} onDrop={(e) => { setTrashDragOver(false); restoreFromDrop(e); }}>🗑<span>{trash.length || ""}</span></button>
       {trashOpen && <aside className="trash-tray" aria-label="Trash">
         <strong>Trash</strong>
         <div className="trash-list">{trash.map(n => <button key={n.id} draggable className="trash-item" onDragStart={e => e.dataTransfer.setData("text/sticky-id", n.id)} onClick={async () => { try { const restored = await api("/notes/" + n.id, { method:"PATCH", body:JSON.stringify({restore:true,version:n.version+1}) }); setNotes(x=>[...x,restored]); setTrash(x=>x.filter(v=>v.id!==n.id)); } catch { setConflict(true); } }}>{n.title || "Untitled note"}</button>)}</div>
