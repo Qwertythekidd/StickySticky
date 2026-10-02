@@ -21,9 +21,11 @@ def db(path=DB):
     CREATE TABLE IF NOT EXISTS scene_settings(id INTEGER PRIMARY KEY CHECK(id=1),preset TEXT NOT NULL DEFAULT 'window',frame_style TEXT NOT NULL DEFAULT 'paper',scene_width REAL NOT NULL DEFAULT 200000,scene_height REAL NOT NULL DEFAULT 150000,board_x REAL NOT NULL DEFAULT 9918,board_y REAL NOT NULL DEFAULT 7450,version INTEGER NOT NULL DEFAULT 1);
     """)
     c.execute("INSERT OR IGNORE INTO board_settings(id) VALUES(1)")
+    scene_exists = c.execute("SELECT 1 FROM scene_settings WHERE id=1").fetchone()
     c.execute("INSERT OR IGNORE INTO scene_settings(id) VALUES(1)")
     b = c.execute("SELECT width,height FROM board_settings WHERE id=1").fetchone()
-    c.execute("UPDATE scene_settings SET scene_width=MAX(scene_width,?),scene_height=MAX(scene_height,?) WHERE id=1 AND version=1", (b[0] + 20000, b[1] + 20000))
+    if scene_exists is None:
+        c.execute("UPDATE scene_settings SET scene_width=MAX(scene_width,?),scene_height=MAX(scene_height,?) WHERE id=1", (b[0] + 20000, b[1] + 20000))
     c.commit(); return c
 
 def utc_now(): return datetime.now(timezone.utc).isoformat()
