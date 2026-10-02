@@ -388,13 +388,8 @@ function App() {
       return q.x >= 0 && q.x <= 235 && q.y >= 0 && q.y <= 174;
     })?.id || null;
     const routed = points.length < 2 ? points : [points[0], ...points.slice(1).flatMap((p, i) => {
-      const a = points[i], dx = p.x-a.x, dy = p.y-a.y, ts = [1];
-      for (const n of ns) for (const [axis, value] of [["x",n.x],["x",n.x+235],["y",n.y],["y",n.y+174]]) {
-        const delta = axis === "x" ? dx : dy, start = axis === "x" ? a.x : a.y;
-        const t = (value-start)/(delta || 1);
-        if (t > 0 && t < 1) { const q = {x:a.x+dx*t,y:a.y+dy*t}; if (q.x >= n.x-1e-7 && q.x <= n.x+235+1e-7 && q.y >= n.y-1e-7 && q.y <= n.y+174+1e-7) ts.push(t); }
-      }
-      return ts.sort((x,y)=>x-y).slice(0,-1).map(t=>({x:a.x+dx*t,y:a.y+dy*t})).concat(p);
+      const a = points[i], steps = 24;
+      return Array.from({length:steps}, (_, j) => { const t=(j+1)/steps; return {x:a.x+(p.x-a.x)*t,y:a.y+(p.y-a.y)*t}; });
     })];
     for (const p of routed) { const next = owner(p); if (next !== current && bucket.length) { if (bucket.length > 1) segments.push({note_id: current, points: bucket}); bucket = [p]; } else bucket.push(p); current = next; }
     if (bucket.length > 1) segments.push({note_id: current, points: bucket});
