@@ -268,16 +268,21 @@ function App() {
       }
     })();
   }, []);
-  async function saveBoard(p) {
-    try {
+  const boardSave = useRef(Promise.resolve());
+  const boardVersion = useRef(board.version);
+  useEffect(() => { boardVersion.current = board.version; }, [board.version]);
+  function saveBoard(p) {
+    boardSave.current = boardSave.current.then(async () => {
+      try {
       const b = await api("/board", {
         method: "PUT",
-        body: JSON.stringify({ ...p, version: board.version }),
+        body: JSON.stringify({ ...p, version: boardVersion.current }),
       });
       setBoard(b);
-    } catch {
-      setConflict(true);
-    }
+      boardVersion.current = b.version;
+      } catch { setConflict(true); }
+    });
+    return boardSave.current;
   }
   async function update(n, p, save = true) {
     setNotes((xs) => xs.map((x) => (x.id === n.id ? { ...x, ...p } : x)));

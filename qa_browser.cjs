@@ -10,7 +10,7 @@ const server = execFile('python3', ['server.py'], { env: { ...process.env, STICK
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const fail = (m) => { throw new Error(m); };
 (async () => {
-  await sleep(400);
+  await sleep(1000);
   const browser = await chromium.launch({ headless: true, executablePath: '/usr/bin/brave-browser' });
   const page = await browser.newPage({ viewport: { width: Number(process.env.QA_WIDTH || 1280), height: Number(process.env.QA_HEIGHT || 800) } });
   const errors = [];
