@@ -274,9 +274,10 @@ function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [b, ns, ss, sc] = await Promise.all([
+        const [b, ns, trashNs, ss, sc] = await Promise.all([
           api("/board").catch(() => board),
           api("/notes"),
+          api("/trash").catch(() => []),
           api("/strokes").catch(() => []),
           api("/scene").catch(() => null),
         ]);
@@ -285,6 +286,7 @@ function App() {
         setHeightPct(Math.max(25, Math.min(10000, Math.round((b.height / 1100) * 100))));
         if (sc) setSceneConfig(sc);
         setNotes(ns);
+        setTrash(Array.isArray(trashNs) ? trashNs : []);
         setStrokes(Array.isArray(ss) ? ss : ss.strokes || []);
         const savedCamera=readCamera(); if(savedCamera){ setZoom(savedCamera.zoom); setPan(savedCamera.pan); }
         cameraReady.current=true;

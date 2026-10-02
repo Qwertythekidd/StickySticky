@@ -75,6 +75,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         p = self.parts(); c = db(self.db_path)
         if p == ["api","notes"]: out = [dict(r) for r in c.execute("SELECT * FROM notes WHERE deleted_at IS NULL AND cleared_at IS NULL ORDER BY rowid")]
+        elif p == ["api","trash"]: out = [dict(r) for r in c.execute("SELECT * FROM notes WHERE deleted_at IS NOT NULL AND cleared_at IS NULL ORDER BY rowid")]
         elif p == ["api","board"]: out = dict(c.execute("SELECT title,subtitle,width,height,version FROM board_settings WHERE id=1").fetchone())
         elif p == ["api","scene"]: out = dict(c.execute("SELECT preset,frame_style,scene_width,scene_height,board_x,board_y,version FROM scene_settings WHERE id=1").fetchone())
         elif p == ["api","strokes"]:
