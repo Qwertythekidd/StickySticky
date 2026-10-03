@@ -11,6 +11,7 @@ STATIC_ROOT = ROOT / "dist" if (ROOT / "dist" / "index.html").is_file() else ROO
 DATA = Path(os.environ.get("STICKY_STICKY_DATA_DIR", Path(os.environ.get("XDG_DATA_HOME", Path.home()/".local/share")) / "sticky-sticky"))
 DATA.mkdir(parents=True, exist_ok=True)
 DB = DATA / "notes.db"
+NATIVE_CONFIG = Path(os.environ.get("STICKY_STICKY_NATIVE_CONFIG", "")) if os.environ.get("STICKY_STICKY_NATIVE_CONFIG") else None
 MAX_BODY = 1_000_000
 
 def db(path=DB):
@@ -35,6 +36,15 @@ def db(path=DB):
     c.commit(); return c
 
 def utc_now(): return datetime.now(timezone.utc).isoformat()
+def native_allowed(h): return bool(NATIVE_CONFIG and h.headers.get("Host", "").split(":")[0] in {"127.0.0.1", "localhost"} and h.headers.get("Origin", "") in {"", f"http://127.0.0.1:{os.environ.get('STICKY_STICKY_PORT','8765')}"})
+def native_prefs():
+    if not NATIVE_CONFIG or not NATIVE_CONFIG.is_file(): return {"enabled": True, "keep_running": True}
+    try:
+        v=json.loads(NATIVE_CONFIG.read_text()); return {"enabled": bool(v.get("enabled",True)), "keep_running": bool(v.get("keep_running",True))}
+    except (OSError, ValueError, TypeError): return {"enabled": True, "keep_running": True}
+def save_native(v):
+    if not NATIVE_CONFIG: return
+    NATIVE_CONFIG.parent.mkdir(parents=True, exist_ok=True); tmp=NATIVE_CONFIG.with_suffix(".tmp"); tmp.write_text(json.dumps(v,separators=(",",":"))); os.replace(tmp,NATIVE_CONFIG)
 
 def _seg_dist(a, b, p):
     dx, dy = b[0]-a[0], b[1]-a[1]
@@ -75,6 +85,10 @@ class Handler(SimpleHTTPRequestHandler):
     def parts(self): return [p for p in urlparse(self.path).path.split("/") if p]
     def do_GET(self):
         p = self.parts(); c = db(self.db_path)
+        if p == ["api","native-preferences"]:
+            c.close();
+            if not native_allowed(self): self.send_error(404); return
+            self.send_json(200,native_prefs()); return
         if p == ["api","notes"]: out = [dict(r) for r in c.execute("SELECT * FROM notes WHERE deleted_at IS NULL AND cleared_at IS NULL ORDER BY rowid")]
         elif p == ["api","trash"]: out = [dict(r) for r in c.execute("SELECT * FROM notes WHERE deleted_at IS NOT NULL AND cleared_at IS NULL ORDER BY rowid")]
         elif p == ["api","staged-notes"]: out = [dict(r) for r in c.execute("SELECT * FROM staged_notes ORDER BY created_at")]
@@ -162,6 +176,9 @@ class Handler(SimpleHTTPRequestHandler):
     def do_PATCH(self):
         p = self.parts(); payload = self.read_body()
         if payload is None: return
+        if p == ["api","native-preferences"]:
+            if not native_allowed(self): self.send_error(404); return
+            v=native_prefs(); v.update({k: bool(payload[k]) for k in ("enabled","keep_running") if k in payload}); save_native(v); self.send_json(200,v); return
         if len(p) != 3 or p[:2] != ["api", p[1]] or p[1] not in {"notes","strokes","staged-notes"}: self.send_error(404); return
         table, item = p[1], p[2]; sql_table = "staged_notes" if table == "staged-notes" else table; c = db(self.db_path); row = c.execute(f"SELECT * FROM {sql_table} WHERE id=?",(item,)).fetchone()
         if row is None or (table != "staged-notes" and row["deleted_at"] is not None and not payload.get("restore") and not payload.get("clear")): self.send_error(404); c.close(); return
