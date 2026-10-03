@@ -119,7 +119,7 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
       <div className="grab">
         ⠿{" "}
       </div>
-      <svg className="note-ink" viewBox="0 0 235 174" preserveAspectRatio="none">
+      <svg className="note-ink" viewBox="0 0 306 226.2" preserveAspectRatio="none">
         {strokes.map(s => <path key={s.id} d={s.points.map((p,i)=>`${i?"L":"M"}${p.x} ${p.y}`).join(" ")} fill="none" stroke={s.color} strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" />)}
       </svg>
       <h3
@@ -385,7 +385,7 @@ function App() {
     setOpen(false);
   }
   async function addAt(x, y, color) {
-    const n = await api("/notes", { method:"POST", body:JSON.stringify({title:"",body:"",color,stamp:"✦",x:Math.max(0,x-118),y:Math.max(0,y-80)}) });
+    const n = await api("/notes", { method:"POST", body:JSON.stringify({title:"",body:"",color,stamp:"✦",x:Math.max(0,x-153),y:Math.max(0,y-113)}) });
     setNotes(xs=>[...xs,n]); setOpen(false);
     requestAnimationFrame(()=>document.querySelector(`.note[data-note-id="${n.id}"] h3`)?.focus());
   }
@@ -407,7 +407,7 @@ function App() {
       const noteSvg = document.querySelector(`[data-note-id="${n.id}"] svg.note-ink`);
       const fromBoard = boardSvg?.getScreenCTM(), toLocal = noteSvg?.getScreenCTM()?.inverse();
       const q = fromBoard && toLocal ? new DOMPoint(p.x, p.y).matrixTransform(fromBoard).matrixTransform(toLocal) : { x:p.x-n.x, y:p.y-n.y };
-      return q.x >= 0 && q.x <= 235 && q.y >= 0 && q.y <= 174;
+      return q.x >= 0 && q.x <= 306 && q.y >= 0 && q.y <= 226.2;
     })?.id || null;
     if (points.length < 2) return points.length ? [{note_id: owner(points[0]), points}] : [];
     return splitOwnedPolyline(points, ns, (p, n) => {
@@ -415,7 +415,7 @@ function App() {
       const noteSvg = document.querySelector(`[data-note-id="${n.id}"] svg.note-ink`);
       const fromBoard = boardSvg?.getScreenCTM(), toLocal = noteSvg?.getScreenCTM()?.inverse();
       return fromBoard && toLocal ? new DOMPoint(p.x, p.y).matrixTransform(fromBoard).matrixTransform(toLocal) : {x:p.x-n.x,y:p.y-n.y};
-    }, q => q.x >= 0 && q.x <= 235 && q.y >= 0 && q.y <= 174);
+    }, q => q.x >= 0 && q.x <= 306 && q.y >= 0 && q.y <= 226.2);
   }
   const toNoteLocal = (p, n) => {
     const boardSvg = document.querySelector("svg.draw");
@@ -471,11 +471,11 @@ function App() {
   const activeNotes = notes.filter((n) => !n.deleted_at && !n.deleted);
   const activeStrokes = strokes.filter((s) => !s.deleted_at && !s.deleted);
   const boardStrokes = activeStrokes.filter(s => !s.note_id);
-  const rawMinBoardWidth = Math.max(400, ...activeNotes.map((n) => Number(n.x || 0) + 235 + 36), ...boardStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.x ?? p[0]) + Number(s.width || 0) / 2 + 18)));
-  const rawMinBoardHeight = Math.max(400, ...activeNotes.map((n) => Number(n.y || 0) + 174 + 36), ...boardStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.y ?? p[1]) + Number(s.width || 0) / 2 + 18)));
+  const rawMinBoardWidth = Math.max(400, ...activeNotes.map((n) => Number(n.x || 0) + 306 + 36), ...boardStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.x ?? p[0]) + Number(s.width || 0) / 2 + 18)));
+  const rawMinBoardHeight = Math.max(400, ...activeNotes.map((n) => Number(n.y || 0) + 226.2 + 36), ...boardStrokes.flatMap((s) => (s.points || []).map((p) => Number(p.y ?? p[1]) + Number(s.width || 0) / 2 + 18)));
   const minBoardWidth = 400, minBoardHeight = 400;
   const minWidthPct = 25, minHeightPct = 25;
-  const overflowEdges = { left: activeNotes.some(n => Number(n.x || 0) < 0), right: activeNotes.some(n => Number(n.x || 0) + 235 > board.width), top: activeNotes.some(n => Number(n.y || 0) < 0), bottom: activeNotes.some(n => Number(n.y || 0) + 174 > board.height) };
+  const overflowEdges = { left: activeNotes.some(n => Number(n.x || 0) < 0), right: activeNotes.some(n => Number(n.x || 0) + 306 > board.width), top: activeNotes.some(n => Number(n.y || 0) < 0), bottom: activeNotes.some(n => Number(n.y || 0) + 226.2 > board.height) };
   const shrinkHint = shrinkNotice || "";
   const maxPanX = Math.max(0, (sceneWidth - viewport.width) / 2);
   const maxPanY = Math.max(0, (sceneHeight - viewport.height) / 2);

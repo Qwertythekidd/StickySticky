@@ -13,14 +13,14 @@ export function splitOwnedPolyline(points, notes, getLocal, isInside) {
     for (const n of notes) {
       const qa = getLocal(a, n), qb = getLocal(b, n);
       const dx = qb.x - qa.x, dy = qb.y - qa.y;
-      const edges = [[0, 'x'], [235, 'x'], [0, 'y'], [174, 'y']];
+      const edges = [[0, 'x'], [306, 'x'], [0, 'y'], [226.2, 'y']];
       for (const [edge, axis] of edges) {
         const d = axis === 'x' ? dx : dy, s = axis === 'x' ? qa.x : qa.y;
         if (Math.abs(d) <= EPS) continue;
         const t = (edge - s) / d;
         if (t > EPS && t < 1 - EPS) {
           const q = lerp(qa, qb, t);
-          if (q.x >= -EPS && q.x <= 235 + EPS && q.y >= -EPS && q.y <= 174 + EPS) cuts.push(t);
+          if (q.x >= -EPS && q.x <= 306 + EPS && q.y >= -EPS && q.y <= 226.2 + EPS) cuts.push(t);
         }
       }
     }
