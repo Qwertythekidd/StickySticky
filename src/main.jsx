@@ -74,6 +74,8 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
         if (e.button !== 1) {
           return;
         }
+        const editable = e.target.closest("[contenteditable],input,textarea");
+        if (editable && document.activeElement === editable) return;
         // Middle-button movement must win even when it starts inside note text;
         // suppress the browser's PRIMARY-selection paste gesture and capture
         // the pointer for the whole move.
