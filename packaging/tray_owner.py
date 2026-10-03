@@ -4,7 +4,7 @@ from pathlib import Path
 import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("AyatanaAppIndicator3", "0.1")
-from gi.repository import Gtk, AyatanaAppIndicator3
+from gi.repository import Gtk, GLib, AyatanaAppIndicator3
 
 ROOT=Path(os.environ.get("STICKY_STICKY_APP_ROOT","/usr/lib/sticky-sticky")); cache=Path(os.environ.get("XDG_CACHE_HOME",Path.home()/".cache"))/"sticky-sticky"; cache.mkdir(parents=True,exist_ok=True)
 lock=open(cache/"instance.lock","w");
@@ -60,6 +60,20 @@ open_item=Gtk.MenuItem(label="Open board"); open_item.connect("activate",open_bo
 quit_item=Gtk.MenuItem(label="Quit"); quit_item.connect("activate",quit_app); menu.append(quit_item)
 menu.show_all()
 indicator.set_menu(menu)
-if not tray_enabled:
-    open_board(); quit_app(); sys.exit(0)
-open_board(); Gtk.main()
+def poll_state():
+    global tray_enabled, keep_running, browser
+    old_enabled, old_keep = tray_enabled, keep_running
+    tray_enabled, keep_running = preferences()
+    indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE if tray_enabled else AyatanaAppIndicator3.IndicatorStatus.PASSIVE)
+    if browser is None or browser.poll() is not None:
+        if browser is not None and not keep_running:
+            cleanup(); Gtk.main_quit(); return False
+        if old_enabled and not tray_enabled and browser is None:
+            open_board()
+        elif browser is None and (tray_enabled or old_enabled is False):
+            open_board()
+    if browser is not None and browser.poll() is not None and (not tray_enabled or not keep_running):
+        cleanup(); Gtk.main_quit(); return False
+    return True
+indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE if tray_enabled else AyatanaAppIndicator3.IndicatorStatus.PASSIVE)
+open_board(); GLib.timeout_add_seconds(1, poll_state); Gtk.main()
