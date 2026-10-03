@@ -72,11 +72,11 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
         // Hand mode reserves middle-click for moving an existing note. Left
         // click remains available for selecting the note and entering text.
         if (e.button !== 1) {
-          if (e.target.closest("[contenteditable],input,button")) return;
           return;
         }
-        // Keep the browser's native left-button text/element drag from
-        // stealing capture. Contenteditable controls above remain editable.
+        // Middle-button movement must win even when it starts inside note text;
+        // suppress the browser's PRIMARY-selection paste gesture and capture
+        // the pointer for the whole move.
         e.preventDefault();
         drag.current = {
           x: e.clientX,
