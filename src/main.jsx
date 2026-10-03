@@ -236,7 +236,7 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const [notes, setNotes] = useState([]),
+  const [notes, setNotes] = useState([]), [staged, setStaged] = useState([]),
     [trash, setTrash] = useState([]),
     [board, setBoard] = useState({
       title: "Our little ideas",
@@ -300,6 +300,7 @@ function App() {
         setHeightPct(Math.max(25, Math.min(10000, Math.round((b.height / 1100) * 100))));
         if (sc) setSceneConfig(sc);
         setNotes(ns);
+        setStaged(await api("/staged-notes").catch(() => []));
         setTrash(Array.isArray(trashNs) ? trashNs : []);
         setStrokes(Array.isArray(ss) ? ss : ss.strokes || []);
         const savedCamera=readCamera(); if(savedCamera){ setZoom(savedCamera.zoom); setPan(savedCamera.pan); }
@@ -309,6 +310,7 @@ function App() {
       }
     })();
   }, []);
+  useEffect(() => { const refresh = () => api("/staged-notes").then(setStaged).catch(() => {}); const id = setInterval(refresh, 2000); return () => clearInterval(id); }, []);
   useEffect(() => { if (!cameraReady.current) return; const t=setTimeout(()=>{ try { localStorage.setItem(cameraKey,JSON.stringify({zoom,pan})); } catch {} },150); return ()=>clearTimeout(t); }, [zoom,pan]);
   const boardSave = useRef(Promise.resolve());
   const boardVersion = useRef(board.version);
@@ -526,6 +528,10 @@ function App() {
       setNotes(x => [...x, restored]); setTrash(x => x.filter(v => v.id !== n.id));
     } catch { setConflict(true); }
   };
+  const placeStaged = async (item, x, y) => {
+    try { const placed = await api(`/staged-notes/${item.id}`, { method:"PATCH", body:JSON.stringify({ place:true, x, y, version:item.version }) }); setStaged(xs=>xs.filter(v=>v.id!==item.id)); setNotes(xs=>[...xs,placed]); }
+    catch { setConflict(true); }
+  };
   return (
     <div className="app">
       <main className="stage" onWheel={onWheel}>
@@ -560,7 +566,7 @@ function App() {
             onContextMenu={(e) => { if (tool !== "select") { e.preventDefault(); setTool("select"); setMarker(false); } }}
             onPointerCancel={() => (panDrag.current = null)}
             onDragOver={(e) => e.preventDefault()}
-            onDrop={restoreFromDrop}
+            onDrop={(e) => { if (e.dataTransfer.getData("text/staged-id")) { e.preventDefault(); const item=staged.find(v=>v.id===e.dataTransfer.getData("text/staged-id")); if (item) { const r=e.currentTarget.getBoundingClientRect(); placeStaged(item,(e.clientX-r.left)/sceneScale-153,(e.clientY-r.top)/sceneScale-113); } } else restoreFromDrop(e); }}
           >
             <DrawLayer
               strokes={activeStrokes.filter(s => !s.note_id)}
@@ -589,6 +595,7 @@ function App() {
         </CameraLayer>
         </SceneLayer>
       </main>
+      <aside className="staging-sidebar" aria-label="Staged notes"><h2>Staged</h2><p>Drop onto the board</p>{staged.map(item => <button type="button" draggable key={item.id} className={`staged-card ${item.color}`} onDragStart={e=>e.dataTransfer.setData("text/staged-id",item.id)} onClick={()=>placeStaged(item,120,120)}><b>{item.title||"Untitled note"}</b><span>{item.body||"Click to place"}</span></button>)}</aside>
       {conflict && (
         <div className="conflict">
           Someone changed this board.{" "}

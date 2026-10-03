@@ -20,6 +20,7 @@ def db(path=DB):
     CREATE TABLE IF NOT EXISTS board_settings(id INTEGER PRIMARY KEY CHECK(id=1),title TEXT NOT NULL DEFAULT '',subtitle TEXT NOT NULL DEFAULT '',width REAL NOT NULL DEFAULT 1600,height REAL NOT NULL DEFAULT 900,version INTEGER NOT NULL DEFAULT 1);
     CREATE TABLE IF NOT EXISTS strokes(id TEXT PRIMARY KEY,points TEXT NOT NULL,color TEXT NOT NULL,width REAL NOT NULL,version INTEGER NOT NULL DEFAULT 1,deleted_at TEXT);
     CREATE TABLE IF NOT EXISTS scene_settings(id INTEGER PRIMARY KEY CHECK(id=1),preset TEXT NOT NULL DEFAULT 'window',frame_style TEXT NOT NULL DEFAULT 'paper',scene_width REAL NOT NULL DEFAULT 200000,scene_height REAL NOT NULL DEFAULT 150000,board_x REAL NOT NULL DEFAULT 9918,board_y REAL NOT NULL DEFAULT 7450,version INTEGER NOT NULL DEFAULT 1);
+    CREATE TABLE IF NOT EXISTS staged_notes(id TEXT PRIMARY KEY,title TEXT NOT NULL,body TEXT NOT NULL,color TEXT NOT NULL,stamp TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL);
     """)
     if "cleared_at" not in {r[1] for r in c.execute("PRAGMA table_info(notes)").fetchall()}:
         c.execute("ALTER TABLE notes ADD COLUMN cleared_at TEXT")
@@ -76,6 +77,7 @@ class Handler(SimpleHTTPRequestHandler):
         p = self.parts(); c = db(self.db_path)
         if p == ["api","notes"]: out = [dict(r) for r in c.execute("SELECT * FROM notes WHERE deleted_at IS NULL AND cleared_at IS NULL ORDER BY rowid")]
         elif p == ["api","trash"]: out = [dict(r) for r in c.execute("SELECT * FROM notes WHERE deleted_at IS NOT NULL AND cleared_at IS NULL ORDER BY rowid")]
+        elif p == ["api","staged-notes"]: out = [dict(r) for r in c.execute("SELECT * FROM staged_notes ORDER BY created_at")]
         elif p == ["api","board"]: out = dict(c.execute("SELECT title,subtitle,width,height,version FROM board_settings WHERE id=1").fetchone())
         elif p == ["api","scene"]: out = dict(c.execute("SELECT preset,frame_style,scene_width,scene_height,board_x,board_y,version FROM scene_settings WHERE id=1").fetchone())
         elif p == ["api","strokes"]:
@@ -91,6 +93,8 @@ class Handler(SimpleHTTPRequestHandler):
             n = {"id":str(uuid.uuid4()),"title":"","body":"","color":"yellow","stamp":"✦","x":100,"y":100,"done":0,"version":1}
             n.update({k:payload[k] for k in n if k in payload and k not in {"id","version"}})
             c.execute("INSERT INTO notes(id,title,body,color,stamp,x,y,done,version) VALUES(?,?,?,?,?,?,?,?,?)", tuple(n.values())); c.commit(); out = dict(c.execute("SELECT * FROM notes WHERE id=?",(n["id"],)).fetchone()); self.send_json(201,out)
+        elif p == ["api","staged-notes"]:
+            n={"id":str(uuid.uuid4()),"title":payload.get("title",""),"body":payload.get("body",""),"color":payload.get("color","yellow"),"stamp":payload.get("stamp","✦"),"version":1,"created_at":utc_now()}; c.execute("INSERT INTO staged_notes VALUES(?,?,?,?,?,?,?)",tuple(n.values())); c.commit(); self.send_json(201,n)
         elif p == ["api","strokes","batch"]:
             originals = payload.get("originals", []); fragments = payload.get("fragments", [])
             try:
@@ -158,16 +162,19 @@ class Handler(SimpleHTTPRequestHandler):
     def do_PATCH(self):
         p = self.parts(); payload = self.read_body()
         if payload is None: return
-        if len(p) != 3 or p[:2] != ["api", p[1]] or p[1] not in {"notes","strokes"}: self.send_error(404); return
-        table, item = p[1], p[2]; c = db(self.db_path); row = c.execute(f"SELECT * FROM {table} WHERE id=?",(item,)).fetchone()
-        if row is None or (row["deleted_at"] is not None and not payload.get("restore") and not payload.get("clear")): self.send_error(404); c.close(); return
+        if len(p) != 3 or p[:2] != ["api", p[1]] or p[1] not in {"notes","strokes","staged-notes"}: self.send_error(404); return
+        table, item = p[1], p[2]; sql_table = "staged_notes" if table == "staged-notes" else table; c = db(self.db_path); row = c.execute(f"SELECT * FROM {sql_table} WHERE id=?",(item,)).fetchone()
+        if row is None or (table != "staged-notes" and row["deleted_at"] is not None and not payload.get("restore") and not payload.get("clear")): self.send_error(404); c.close(); return
         if payload.get("version") is not None and int(payload["version"]) != row["version"]: self.send_json(409,{"error":"conflict","current_version":row["version"]}); c.close(); return
-        allowed = {"title","body","color","stamp","x","y","done"} if table == "notes" else {"points","color","width"}; vals = {k:payload[k] for k in allowed if k in payload}
+        if table == "staged-notes" and payload.get("place"):
+            if payload.get("version") is not None and int(payload["version"]) != row["version"]: self.send_json(409,{"error":"conflict"}); c.close(); return
+            c.execute("INSERT INTO notes(id,title,body,color,stamp,x,y,done,version) VALUES(?,?,?,?,?,?,?,?,?)",(item,row["title"],row["body"],row["color"],row["stamp"],float(payload.get("x",100)),float(payload.get("y",100)),0,1)); c.execute("DELETE FROM staged_notes WHERE id=?",(item,)); c.commit(); self.send_json(200,dict(c.execute("SELECT * FROM notes WHERE id=?",(item,)).fetchone())); c.close(); return
+        allowed = {"title","body","color","stamp","x","y","done"} if table == "notes" else ({"title","body","color","stamp"} if table == "staged-notes" else {"points","color","width"}); vals = {k:payload[k] for k in allowed if k in payload}
         if table == "notes" and payload.get("clear"): vals["cleared_at"] = utc_now()
         if "points" in vals: vals["points"] = json.dumps(vals["points"])
         if payload.get("restore"): vals["deleted_at"] = None
-        if vals: c.execute(f"UPDATE {table} SET " + ",".join(f"{k}=?" for k in vals) + ",version=version+1 WHERE id=?", (*vals.values(),item)); c.commit()
-        out = dict(c.execute(f"SELECT * FROM {table} WHERE id=?",(item,)).fetchone());
+        if vals: c.execute(f"UPDATE {sql_table} SET " + ",".join(f"{k}=?" for k in vals) + ",version=version+1 WHERE id=?", (*vals.values(),item)); c.commit()
+        out = dict(c.execute(f"SELECT * FROM {sql_table} WHERE id=?",(item,)).fetchone());
         if table == "strokes": out["points"] = json.loads(out["points"])
         self.send_json(200,out); c.close()
     def do_DELETE(self):
