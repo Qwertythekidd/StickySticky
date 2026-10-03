@@ -70,6 +70,12 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
       }}
       onPointerDown={(e) => {
         if (e.target.closest("[contenteditable],input,button")) return;
+        // Hand mode reserves middle-click for moving an existing note. Left
+        // click remains available for selecting the note and entering text.
+        if (e.button !== 1) return;
+        // Keep the browser's native left-button text/element drag from
+        // stealing capture. Contenteditable controls above remain editable.
+        e.preventDefault();
         drag.current = {
           x: e.clientX,
           y: e.clientY,
@@ -142,7 +148,7 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
   );
 }
 function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom, width, height, notes }) {
-  const ref = useRef(null), drawing = useRef(null), cursor = useRef(null), [, repaint] = React.useState(0);
+  const ref = useRef(null), drawing = useRef(null), cursor = useRef(null), cursorMark = useRef(null), [, repaint] = React.useState(0);
   const path = (points) => points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const point = (e) => {
     const svg = ref.current, matrix = svg?.getScreenCTM()?.inverse();
@@ -154,11 +160,15 @@ function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom,
     <svg
       ref={ref}
       className="draw"
-      style={{ zIndex: drawing.current ? 3 : 1 }}
+      // Drawing must sit above notes so the live footprint remains visible on
+      // both surfaces. Hand mode is deliberately transparent so notes keep
+      // their normal editing/dragging behavior.
+      style={{ zIndex: tool === "select" ? 1 : 4, pointerEvents: tool === "select" ? "none" : "auto" }}
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
       onPointerDown={(e) => {
         if (tool === "select" || e.button !== 0) return;
+        e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
         const p = point(e); if (!p) return;
         drawing.current = [p];
@@ -167,6 +177,7 @@ function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom,
       onPointerMove={(e) => {
         const p = point(e);
         if (cursor.current && p) { cursor.current.setAttribute("cx", p.x); cursor.current.setAttribute("cy", p.y); }
+        if (cursorMark.current && p) cursorMark.current.setAttribute("transform", `translate(${p.x} ${p.y})`);
         if (!drawing.current) return;
         if (!p) return;
         drawing.current.push(p);
@@ -194,6 +205,13 @@ function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom,
       <circle ref={cursor} cx="0" cy="0" r={tool === "eraser" ? eraserSize / 2 : markerSize / 2} fill="none"
         stroke={tool === "eraser" ? "#453c54" : color} strokeDasharray={tool === "eraser" ? "4 3" : "none"}
         strokeWidth={tool === "eraser" ? 1.5 / zoom : 2 / zoom} pointerEvents="none" visibility={tool === "select" ? "hidden" : "visible"} />
+      {tool !== "eraser" && <g ref={cursorMark} transform="translate(0 0)">
+        <circle cx="0" cy="0" r={Math.max(2.5, Math.min(5, markerSize / 2.5))}
+          fill={color} stroke="#fffdf8" strokeWidth={1.25 / zoom} pointerEvents="none"
+          visibility={tool === "select" ? "hidden" : "visible"} />
+        <path d="M-3.5 0H3.5M0-3.5V3.5" stroke="#fffdf8" strokeWidth={1.2 / zoom}
+          strokeLinecap="round" pointerEvents="none" visibility={tool === "select" ? "hidden" : "visible"} />
+      </g>}
     </svg>
   );
 }
@@ -532,7 +550,8 @@ function App() {
             onSubtitleBlur={(e) => saveBoard({ subtitle: e.target.value })}
             onPointerDown={(e) => {
               if (open) { if (paletteDrag.current) return; if (e.target.closest("input,textarea,select,button,.note")) return; const r=e.currentTarget.getBoundingClientRect(); addAt((e.clientX-r.left)/sceneScale,(e.clientY-r.top)/sceneScale,form.color); return; }
-              if (tool !== "select" || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
+              if (tool !== "select" || e.button !== 1 || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
+              e.preventDefault();
               panDrag.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
               e.currentTarget.setPointerCapture(e.pointerId);
             }}
@@ -630,7 +649,7 @@ function App() {
         >
           ✎ Marker
         </button>
-        <button className={tool === "select" ? "active" : ""} onClick={() => { setTool("select"); setMarker(false); }}>✋ Hand</button>
+        <button className={tool === "select" ? "active" : ""} title="Left-click to select or edit; middle-click to move" onClick={() => { setTool("select"); setMarker(false); }}>✋ Hand</button>
         {marker && (
           <div className="marker-pop">
             <b>Pick a marker</b>
