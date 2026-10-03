@@ -41,7 +41,7 @@ def open_board(_=None):
  if browser and browser.poll() is None: return
  chrome=os.environ.get("STICKY_STICKY_BROWSER") or next((p for p in ("brave-browser","chromium","chromium-browser") if shutil.which(p)),None)
  if not chrome: return
- browser=subprocess.Popen([chrome,"--class=sticky-sticky","--name=sticky-sticky",f"--app=http://127.0.0.1:{port}/",f"--user-data-dir={cache/'browser'}"])
+ browser=subprocess.Popen([chrome,"--user-data-dir="+str(cache/"browser"),"--no-first-run","--no-default-browser-check","--disable-session-crashed-bubble","--new-window","--class=sticky-sticky","--name=sticky-sticky",f"--app=http://127.0.0.1:{port}/"], start_new_session=True)
 def quit_app(_=None):
  if browser and browser.poll() is None: browser.terminate()
  try: browser.wait(timeout=5)
