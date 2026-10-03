@@ -27,12 +27,11 @@ while True:
 env={**os.environ,"STICKY_STICKY_PORT":str(port),"STICKY_STICKY_DATA_DIR":data,"STICKY_STICKY_NATIVE_CONFIG":config}
 if not (ROOT/"server.py").is_file():
     raise SystemExit(f"Sticky-Sticky app root is missing server.py: {ROOT}")
-server=subprocess.Popen([sys.executable,"-u",str(ROOT/"server.py")],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+server=subprocess.Popen([sys.executable,"-u",str(ROOT/"server.py")],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 def server_ready():
     for _ in range(50):
         if server.poll() is not None:
-            err=server.stderr.read().decode(errors="replace").strip()
-            raise SystemExit(f"Sticky-Sticky backend exited during startup: {err[-500:]}")
+            raise SystemExit("Sticky-Sticky backend exited during startup")
         try:
             with socket.create_connection(("127.0.0.1",port),timeout=.1): return
         except OSError: time.sleep(.1)
