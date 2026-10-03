@@ -166,7 +166,7 @@ function DrawLayer({ strokes, tool, color, markerSize, eraserSize, onDraw, zoom,
       // Drawing must sit above notes so the live footprint remains visible on
       // both surfaces. Hand mode is deliberately transparent so notes keep
       // their normal editing/dragging behavior.
-      style={{ zIndex: tool === "select" ? 1 : 4, pointerEvents: tool === "select" ? "none" : "auto" }}
+      style={{ zIndex: tool === "select" ? 1 : 4, pointerEvents: tool === "select" ? "none" : "auto", cursor: tool === "select" ? "grab" : "crosshair" }}
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
       onPointerDown={(e) => {
