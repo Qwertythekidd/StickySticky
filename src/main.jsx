@@ -55,7 +55,7 @@ const scenePresets = {
   window: "scene-window",
   sunset: "scene-sunset",
 };
-function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
+function Note({ n, onUpdate, onDelete, zoom, tool, strokes, moveButton }) {
   const drag = useRef(null);
   return (
     <article
@@ -71,7 +71,7 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
       onPointerDown={(e) => {
         // Right-drag moves an existing note. Left click remains available for
         // selecting/editing, while middle click keeps native paste behavior.
-        if (e.button !== 2) {
+        if (e.button !== moveButton) {
           return;
         }
         const editable = e.target.closest("[contenteditable],input,textarea");
@@ -89,7 +89,7 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
         e.currentTarget.setPointerCapture(e.pointerId);
       }}
       onAuxClick={(e) => { if (e.button === 2) e.preventDefault(); }}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => { if (moveButton === 2) e.preventDefault(); }}
       onPointerMove={(e) =>
         drag.current &&
         onUpdate(
@@ -261,9 +261,11 @@ function App() {
     [open, setOpen] = useState(false),
     [form, setForm] = useState({ title: "", body: "", color: "yellow" }),
     [conflict, setConflict] = useState(false),
-    [shrinkNotice, setShrinkNotice] = useState("");
+    [shrinkNotice, setShrinkNotice] = useState(""),
+    [moveButton, setMoveButton] = useState(() => { try { return Number(localStorage.getItem("sticky-move-button")) === 1 ? 1 : 2; } catch { return 2; } });
   const [trashOpen, setTrashOpen] = useState(false);
   const [stagingOpen, setStagingOpen] = useState(() => { try { return localStorage.getItem("sticky-staging-open") !== "0"; } catch { return true; } });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [trashDragOver, setTrashDragOver] = useState(false);
   const panDrag = useRef(null);
   const paletteDrag = useRef(null);
@@ -552,7 +554,7 @@ function App() {
             onSubtitleBlur={(e) => saveBoard({ subtitle: e.target.value })}
             onPointerDown={(e) => {
               if (open) { if (paletteDrag.current) return; if (e.target.closest("input,textarea,select,button,.note")) return; const r=e.currentTarget.getBoundingClientRect(); addAt((e.clientX-r.left)/sceneScale,(e.clientY-r.top)/sceneScale,form.color); return; }
-              if (tool !== "select" || e.button !== 2 || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
+              if (tool !== "select" || e.button !== moveButton || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
               e.preventDefault();
               panDrag.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -565,7 +567,7 @@ function App() {
               }));
             }}
             onPointerUp={() => (panDrag.current = null)}
-            onContextMenu={(e) => { if (e.target.closest(".note,.draw") || e.currentTarget === e.target) e.preventDefault(); }}
+            onContextMenu={(e) => { if (moveButton === 2 && (e.target.closest(".note,.draw") || e.currentTarget === e.target)) e.preventDefault(); }}
             onPointerCancel={() => (panDrag.current = null)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => { if (e.dataTransfer.getData("text/staged-id")) { e.preventDefault(); const item=staged.find(v=>v.id===e.dataTransfer.getData("text/staged-id")); if (item) { const r=e.currentTarget.getBoundingClientRect(); placeStaged(item,(e.clientX-r.left)/sceneScale-153,(e.clientY-r.top)/sceneScale-113); } } else restoreFromDrop(e); }}
@@ -591,13 +593,15 @@ function App() {
                 strokes={activeStrokes.filter(s => s.note_id === n.id)}
                 onUpdate={update}
                 onDelete={remove}
+                moveButton={moveButton}
               />
             ))}
           </Board>
         </CameraLayer>
         </SceneLayer>
       </main>
-      {stagingOpen ? <aside className="staging-sidebar" aria-label="Staged notes"><button className="staging-toggle" aria-label="Collapse staged notes" onClick={()=>{setStagingOpen(false);try{localStorage.setItem("sticky-staging-open","0")}catch{}}}>⌄</button><h2>Staged</h2><p>Drop onto the board</p>{staged.map(item => <button type="button" draggable key={item.id} className={`staged-card ${item.color}`} onDragStart={e=>e.dataTransfer.setData("text/staged-id",item.id)} onClick={()=>placeStaged(item,120,120)}><b>{item.title||"Untitled note"}</b><span>{item.body||"Click to place"}</span></button>)}</aside> : <button className="staging-drawer" aria-label="Open staged notes" onClick={()=>{setStagingOpen(true);try{localStorage.setItem("sticky-staging-open","1")}catch{}}}>› <span>{staged.length||""}</span></button>}
+      {settingsOpen ? <aside className="staging-sidebar" aria-label="Movement settings"><button className="staging-toggle" aria-label="Close settings" onClick={()=>setSettingsOpen(false)}>⌄</button><h2>Settings</h2><p>Existing note movement</p><label className="setting-choice"><input type="radio" checked={moveButton===2} onChange={()=>{setMoveButton(2);localStorage.setItem("sticky-move-button","2")}} /> Right-click drag</label><label className="setting-choice"><input type="radio" checked={moveButton===1} onChange={()=>{setMoveButton(1);localStorage.setItem("sticky-move-button","1")}} /> Middle-click drag<br/><small>Focused editor middle-click paste remains native.</small></label></aside> : stagingOpen ? <aside className="staging-sidebar" aria-label="Staged notes"><button className="staging-toggle" aria-label="Collapse staged notes" onClick={()=>{setStagingOpen(false);try{localStorage.setItem("sticky-staging-open","0")}catch{}}}>⌄</button><h2>Staged</h2><p>Drop onto the board</p>{staged.map(item => <button type="button" draggable key={item.id} className={`staged-card ${item.color}`} onDragStart={e=>e.dataTransfer.setData("text/staged-id",item.id)} onClick={()=>placeStaged(item,120,120)}><b>{item.title||"Untitled note"}</b><span>{item.body||"Click to place"}</span></button>)}</aside> : <button className="staging-drawer" aria-label="Open staged notes" onClick={()=>{setStagingOpen(true);try{localStorage.setItem("sticky-staging-open","1")}catch{}}}>› <span>{staged.length||""}</span></button>}
+      <button className="settings-drawer" aria-label="Open movement settings" onClick={()=>{setSettingsOpen(true);setStagingOpen(false)}}>⚙</button>
       {conflict && (
         <div className="conflict">
           Someone changed this board.{" "}
