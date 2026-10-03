@@ -617,7 +617,7 @@ function App() {
         </button>
         {open && <div className="marker-pop note-palette" role="dialog" aria-label="Choose note color">
           <b>Choose a color, then click the board</b>
-          {colors.map(c=><button key={c} className={`cap ${c} ${form.color===c?"active":""}`} onPointerDown={(e)=>{paletteDrag.current={color:c,last:{x:e.clientX,y:e.clientY}}; e.currentTarget.setPointerCapture?.(e.pointerId);}} onClick={()=>setForm(f=>({...f,color:c}))}>{c}</button>)}
+          {colors.map(c=><button key={c} className={`cap ${c} ${form.color===c?"active":""}`} onPointerDown={(e)=>{if(e.button!==0)return; paletteDrag.current={color:c,last:{x:e.clientX,y:e.clientY}}; e.currentTarget.setPointerCapture?.(e.pointerId);}} onClick={()=>setForm(f=>({...f,color:c}))}>{c}</button>)}
           <button onClick={()=>setOpen(false)}>Cancel</button>
         </div>}
         <button
