@@ -69,10 +69,12 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
         pointerEvents: tool === "select" ? "auto" : "none",
       }}
       onPointerDown={(e) => {
-        if (e.target.closest("[contenteditable],input,button")) return;
         // Hand mode reserves middle-click for moving an existing note. Left
         // click remains available for selecting the note and entering text.
-        if (e.button !== 1) return;
+        if (e.button !== 1) {
+          if (e.target.closest("[contenteditable],input,button")) return;
+          return;
+        }
         // Keep the browser's native left-button text/element drag from
         // stealing capture. Contenteditable controls above remain editable.
         e.preventDefault();
@@ -84,6 +86,7 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
         };
         e.currentTarget.setPointerCapture(e.pointerId);
       }}
+      onAuxClick={(e) => { if (e.button === 1) e.preventDefault(); }}
       onPointerMove={(e) =>
         drag.current &&
         onUpdate(
