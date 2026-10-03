@@ -29,4 +29,4 @@ for i in $(seq 1 50); do curl -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1 && 
 CHROME="${STICKY_STICKY_BROWSER:-}"
 [ -n "$CHROME" ] || CHROME="$(command -v brave-browser || command -v chromium || command -v chromium-browser || true)"
 [ -n "$CHROME" ] || { echo 'Sticky-Sticky needs Brave, Chromium, or Chromium Browser.' >&2; exit 1; }
-exec "$CHROME" --app="http://127.0.0.1:$PORT/" --user-data-dir="${XDG_CACHE_HOME:-$HOME/.cache}/sticky-sticky/browser" "$@"
+exec "$CHROME" --class=sticky-sticky --name=sticky-sticky --app="http://127.0.0.1:$PORT/" --user-data-dir="${XDG_CACHE_HOME:-$HOME/.cache}/sticky-sticky/browser" "$@"
