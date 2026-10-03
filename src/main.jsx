@@ -263,11 +263,11 @@ function App() {
     [conflict, setConflict] = useState(false),
     [shrinkNotice, setShrinkNotice] = useState(""),
     [moveButton, setMoveButton] = useState(() => { try { return Number(localStorage.getItem("sticky-move-button")) === 1 ? 1 : 2; } catch { return 2; } });
-  const nativeControls = typeof window !== "undefined" && (window.location.protocol === "file:" || window.__STICKY_NATIVE__ === true);
+  const [nativeControls, setNativeControls] = useState(false);
   const [trayEnabled, setTrayEnabled] = useState(() => { try { return localStorage.getItem("sticky-tray-enabled") !== "0"; } catch { return true; } });
   const [keepRunning, setKeepRunning] = useState(() => { try { return localStorage.getItem("sticky-close-action") !== "quit"; } catch { return true; } });
   const setNativePreference = async (patch) => { try { const v = await api("/native-preferences", { method: "PATCH", body: JSON.stringify(patch) }); setTrayEnabled(v.enabled); setKeepRunning(v.keep_running); } catch { setConflict(true); } };
-  useEffect(() => { if (!nativeControls) return; api("/native-preferences").then(v => { setTrayEnabled(v.enabled); setKeepRunning(v.keep_running); }).catch(() => setConflict(true)); }, [nativeControls]);
+  useEffect(() => { api("/native-preferences").then(v => { setNativeControls(true); setTrayEnabled(v.enabled); setKeepRunning(v.keep_running); }).catch(() => setNativeControls(false)); }, []);
   const [trashOpen, setTrashOpen] = useState(false);
   const [stagingOpen, setStagingOpen] = useState(() => { try { return localStorage.getItem("sticky-staging-open") !== "0"; } catch { return true; } });
   const [settingsOpen, setSettingsOpen] = useState(false);

@@ -12,6 +12,10 @@ try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
 except BlockingIOError: sys.exit("Sticky-Sticky is already running")
 port=int(os.environ.get("STICKY_STICKY_PORT","8765")); data=os.environ.get("STICKY_STICKY_DATA_DIR",str(Path(os.environ.get("XDG_DATA_HOME",Path.home()/".local/share"))/"sticky-sticky")); os.makedirs(data,exist_ok=True)
 config=os.environ.get("STICKY_STICKY_NATIVE_CONFIG",str(Path(os.environ.get("XDG_CONFIG_HOME",Path.home()/".config"))/"sticky-sticky"/"native.json"))
+def preferences():
+    try:
+        v=__import__('json').loads(Path(config).read_text()); return bool(v.get('enabled',True)), bool(v.get('keep_running',True))
+    except (OSError, ValueError, TypeError): return True, True
 while True:
  s=socket.socket();
  try: s.bind(("127.0.0.1",port)); s.close(); break
@@ -30,6 +34,7 @@ def server_ready():
         except OSError: time.sleep(.1)
     server.terminate(); raise SystemExit(f"Sticky-Sticky backend did not become ready on 127.0.0.1:{port}")
 server_ready()
+tray_enabled, keep_running = preferences()
 browser=None
 def open_board(_=None):
  global browser
@@ -55,4 +60,6 @@ open_item=Gtk.MenuItem(label="Open board"); open_item.connect("activate",open_bo
 quit_item=Gtk.MenuItem(label="Quit"); quit_item.connect("activate",quit_app); menu.append(quit_item)
 menu.show_all()
 indicator.set_menu(menu)
+if not tray_enabled:
+    open_board(); quit_app(); sys.exit(0)
 open_board(); Gtk.main()
