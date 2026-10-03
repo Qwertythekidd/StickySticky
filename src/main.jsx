@@ -262,6 +262,7 @@ function App() {
     [conflict, setConflict] = useState(false),
     [shrinkNotice, setShrinkNotice] = useState("");
   const [trashOpen, setTrashOpen] = useState(false);
+  const [stagingOpen, setStagingOpen] = useState(() => { try { return localStorage.getItem("sticky-staging-open") !== "0"; } catch { return true; } });
   const [trashDragOver, setTrashDragOver] = useState(false);
   const panDrag = useRef(null);
   const paletteDrag = useRef(null);
@@ -595,7 +596,7 @@ function App() {
         </CameraLayer>
         </SceneLayer>
       </main>
-      <aside className="staging-sidebar" aria-label="Staged notes"><h2>Staged</h2><p>Drop onto the board</p>{staged.map(item => <button type="button" draggable key={item.id} className={`staged-card ${item.color}`} onDragStart={e=>e.dataTransfer.setData("text/staged-id",item.id)} onClick={()=>placeStaged(item,120,120)}><b>{item.title||"Untitled note"}</b><span>{item.body||"Click to place"}</span></button>)}</aside>
+      {stagingOpen ? <aside className="staging-sidebar" aria-label="Staged notes"><button className="staging-toggle" aria-label="Collapse staged notes" onClick={()=>{setStagingOpen(false);try{localStorage.setItem("sticky-staging-open","0")}catch{}}}>⌄</button><h2>Staged</h2><p>Drop onto the board</p>{staged.map(item => <button type="button" draggable key={item.id} className={`staged-card ${item.color}`} onDragStart={e=>e.dataTransfer.setData("text/staged-id",item.id)} onClick={()=>placeStaged(item,120,120)}><b>{item.title||"Untitled note"}</b><span>{item.body||"Click to place"}</span></button>)}</aside> : <button className="staging-drawer" aria-label="Open staged notes" onClick={()=>{setStagingOpen(true);try{localStorage.setItem("sticky-staging-open","1")}catch{}}}>› <span>{staged.length||""}</span></button>}
       {conflict && (
         <div className="conflict">
           Someone changed this board.{" "}
