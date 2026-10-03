@@ -3,6 +3,7 @@ Name=Sticky-Sticky
 Comment=A simple, draggable notes board for tracking tasks and priorities.
 Exec=/usr/bin/sticky-sticky
 Icon=sticky-sticky
+StartupWMClass=sticky-sticky
 Type=Application
 Categories=Utility;Office;
 Terminal=false
