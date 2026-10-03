@@ -7,9 +7,13 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import Gtk, GLib, AyatanaAppIndicator3
 
 ROOT=Path(os.environ.get("STICKY_STICKY_APP_ROOT","/usr/lib/sticky-sticky")); cache=Path(os.environ.get("XDG_CACHE_HOME",Path.home()/".cache"))/"sticky-sticky"; cache.mkdir(parents=True,exist_ok=True)
-lock=open(cache/"instance.lock","w");
+lock=open(cache/"instance.lock","w"); control=cache/"control.sock"; duplicate=False
 try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-except BlockingIOError: sys.exit("Sticky-Sticky is already running")
+except BlockingIOError:
+    try:
+        c=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); c.settimeout(2); c.connect(str(control)); c.sendall(b"open\n"); c.recv(2); c.close()
+    except OSError: pass
+    sys.exit(0)
 port=int(os.environ.get("STICKY_STICKY_PORT","8765")); data=os.environ.get("STICKY_STICKY_DATA_DIR",str(Path(os.environ.get("XDG_DATA_HOME",Path.home()/".local/share"))/"sticky-sticky")); os.makedirs(data,exist_ok=True)
 config=os.environ.get("STICKY_STICKY_NATIVE_CONFIG",str(Path(os.environ.get("XDG_CONFIG_HOME",Path.home()/".config"))/"sticky-sticky"/"native.json"))
 def preferences():
@@ -36,6 +40,10 @@ def server_ready():
 server_ready()
 tray_enabled, keep_running = preferences()
 browser=None
+control_listener=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+try: control.unlink()
+except FileNotFoundError: pass
+control_listener.bind(str(control)); os.chmod(control,0o600); control_listener.listen(4); control_listener.setblocking(False)
 def open_board(_=None):
  global browser
  if browser and browser.poll() is None: return
@@ -48,6 +56,8 @@ def quit_app(_=None):
  except Exception: pass
  server.terminate(); Gtk.main_quit()
 def cleanup():
+    try: control_listener.close(); control.unlink()
+    except (OSError, NameError): pass
     if server.poll() is None:
         server.terminate()
         try: server.wait(timeout=3)
@@ -75,5 +85,12 @@ def poll_state():
     if browser is not None and browser.poll() is not None and (not tray_enabled or not keep_running):
         cleanup(); Gtk.main_quit(); return False
     return True
+def poll_control():
+    try:
+        c,_=control_listener.accept(); data=c.recv(32)
+        if data == b"open\n": open_board(); c.sendall(b"ok")
+        c.close()
+    except BlockingIOError: pass
+    return True
 indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE if tray_enabled else AyatanaAppIndicator3.IndicatorStatus.PASSIVE)
-open_board(); GLib.timeout_add_seconds(1, poll_state); Gtk.main()
+open_board(); GLib.timeout_add(200, poll_control); GLib.timeout_add_seconds(1, poll_state); Gtk.main()
