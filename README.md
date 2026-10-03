@@ -15,4 +15,12 @@ python3 tools/sticky-stage.py --server http://127.0.0.1:8765 --title "Next idea"
 
 Use an explicit `--server` target. Port `8765` is the development-server default; the installed launcher chooses an available loopback port, so installed clients should use the launcher’s configured `STICKY_STICKY_PORT` or a separately managed server URL rather than guessing `8765`.
 
+For the installed launcher, read the active local target from its log, then pass it explicitly:
+
+```sh
+log="${XDG_CACHE_HOME:-$HOME/.cache}/sticky-sticky/server.log"
+server="$(sed -n 's#.*Sticky-Sticky at \(http://127\.0\.0\.1:[0-9][0-9]*\).*#\1#p' "$log" | tail -n 1)"
+python3 tools/sticky-stage.py --server "$server" --title "Next idea"
+```
+
 The application polls `GET /api/staged-notes`, and placement uses `PATCH /api/staged-notes/:id` with `{ "place": true, "x": ..., "y": ..., "version": ... }`. Placement is version-checked and removes the staged item only after creating the placed note.
