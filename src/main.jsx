@@ -138,17 +138,6 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
       >
         {n.body}
       </p>
-      <div className="meta">
-        <label>
-          <input
-            type="checkbox"
-            checked={!!n.done}
-            onChange={(e) => onUpdate(n, { done: e.target.checked })}
-          />
-          {n.done ? "Done" : "Open"}
-        </label>
-        <span className="stamp">{n.stamp || "✦"}</span>
-      </div>
     </article>
   );
 }
