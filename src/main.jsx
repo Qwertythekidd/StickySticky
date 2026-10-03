@@ -69,14 +69,14 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
         pointerEvents: tool === "select" ? "auto" : "none",
       }}
       onPointerDown={(e) => {
-        // Hand mode reserves middle-click for moving an existing note. Left
-        // click remains available for selecting the note and entering text.
-        if (e.button !== 1) {
+        // Right-drag moves an existing note. Left click remains available for
+        // selecting/editing, while middle click keeps native paste behavior.
+        if (e.button !== 2) {
           return;
         }
         const editable = e.target.closest("[contenteditable],input,textarea");
         if (editable && document.activeElement === editable) return;
-        // Middle-button movement must win even when it starts inside note text;
+        // Right-button movement must win even when it starts inside note text;
         // suppress the browser's PRIMARY-selection paste gesture and capture
         // the pointer for the whole move.
         e.preventDefault();
@@ -88,7 +88,8 @@ function Note({ n, onUpdate, onDelete, zoom, tool, strokes }) {
         };
         e.currentTarget.setPointerCapture(e.pointerId);
       }}
-      onAuxClick={(e) => { if (e.button === 1) e.preventDefault(); }}
+      onAuxClick={(e) => { if (e.button === 2) e.preventDefault(); }}
+      onContextMenu={(e) => e.preventDefault()}
       onPointerMove={(e) =>
         drag.current &&
         onUpdate(
@@ -551,7 +552,7 @@ function App() {
             onSubtitleBlur={(e) => saveBoard({ subtitle: e.target.value })}
             onPointerDown={(e) => {
               if (open) { if (paletteDrag.current) return; if (e.target.closest("input,textarea,select,button,.note")) return; const r=e.currentTarget.getBoundingClientRect(); addAt((e.clientX-r.left)/sceneScale,(e.clientY-r.top)/sceneScale,form.color); return; }
-              if (tool !== "select" || e.button !== 1 || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
+              if (tool !== "select" || e.button !== 2 || (e.target !== e.currentTarget && !e.target.closest(".draw"))) return;
               e.preventDefault();
               panDrag.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -564,7 +565,7 @@ function App() {
               }));
             }}
             onPointerUp={() => (panDrag.current = null)}
-            onContextMenu={(e) => { if (tool !== "select") { e.preventDefault(); setTool("select"); setMarker(false); } }}
+            onContextMenu={(e) => { if (e.target.closest(".note,.draw") || e.currentTarget === e.target) e.preventDefault(); }}
             onPointerCancel={() => (panDrag.current = null)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => { if (e.dataTransfer.getData("text/staged-id")) { e.preventDefault(); const item=staged.find(v=>v.id===e.dataTransfer.getData("text/staged-id")); if (item) { const r=e.currentTarget.getBoundingClientRect(); placeStaged(item,(e.clientX-r.left)/sceneScale-153,(e.clientY-r.top)/sceneScale-113); } } else restoreFromDrop(e); }}
